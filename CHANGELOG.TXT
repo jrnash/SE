@@ -1,0 +1,588 @@
+    Copyright (C) 1990-2007  John R. Nash [jrnash@gmail.com]
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+Ver 1.0 RC1 (Start: 6/3/2007) (Froze: 12:27 AM 7/16/2007)
+----------------------------------------------------------------------
+ 1-Default havekey to true so user can password lock simulation without key
+ 2-Updated credits to SimulatedEvolution.com
+ 3-Removed most comments from SE_IO.PAS to avoid memory errors in TP5.5
+ 4-Updated comment headers in all other include files 
+
+Ver 1.0beta (Start: 2-10-96) (Froze: )
+----------------------------------------------------------------------
+ 1-Include Intro E-Mail Address in CRC Info
+ 2-Changed "Min to run" to "Min To Run"
+ 3-Changed range for M File Size from 1-10 to 0-50
+ 4-Changed range for Min To Run from 1-65536 to 0-65536
+  -Change price from $5 to $5 for FTP download $10 for floppy disk.
+  -Need to incorporate BGI file into SE.EXE! Contact Borland!
+  -Protection for ALT-CTRL-DEL when in screen saver mode.  Contact Borland!
+
+Ver 1.0alpha2 (Start: 2-04-96) (Froze: 2-10-96 22:27:00)
+----------------------------------------------------------------------
+ 1-Polish Exit info/CRC Info
+ 2-Include Intro E-Mail Address in CRC Info
+ 3-PRESS ANY KEY - Added at end to guarantee all exit info. displayed
+ 4-Use jrnash@indirect.com account for E-mail note. (Encrypted)
+ 5-Check size of log file against Max setting before logging
+ 6-Changed order of Log file fields to easier graphing.
+h -Option for either bug moves or time for logging interval!
+h -Error checking code for command line arguments
+
+Ver 1.0alpha1 (Start: 1-29-96) (Froze: 1-29-96)
+----------------------------------------------------------------------
+ --Exit Info displayed in graph mode as to include more info.
+ 1-Use of CRYPT.PAS to encrypt mailing address - Ready for Alpha Dist.
+ 2-Add space between days and time in Log file
+ 3-Add Headers to Log file columns as shown in Series2.xls
+
+Ver 0.9a1 (Start: 1-28-96) (Froze: 1-28-96 21:25:00)
+----------------------------------------------------------------------
+ 1-Logging Interval changed to Seconds with default of (10) 
+   Might want to change to bug moves for same reason as Graph!
+ 2-Logging to logfile (all but Avg's)
+ 3-Logging enabled if Log Filename entered as a command line arg 
+ 4-Graph displayed/Updated as soon as simulation starts/is loaded
+ 5-Add Avg's to logging file
+ 6-Change "Overwrite" warning to "Append" warning on LogFile Start
+ 7-LogFile start must always add header on Start
+ 8-Add Registration Instructions
+ 9 -Added "Shareware - Please Register" to intro.
+
+N1-Time saved in sim file has no leading zero's
+P3-Invalid LogFile name entered at Command line will cause problems
+   unless error checking code is inserted
+
+Ver 0.8c2 (Start: 1-26-96) (Froze: 1-28-96 12:00:00 noon on SB Sunday!)
+--------- (Believed to be ULTRA stable - Ready for Ver 0.9!!!!!! )
+ 1-Consolidated code into Calc_and_update_Elapsed_Time()
+ 2-Add <CR> option on integer values in menu to prompt user for value?
+ 3-Freezeing Elapsed time by inc tStartS during time program not running.
+ 4-Program asks for Reg. Code to change password or Lock Screen (ABG506)
+ 5-Command line specified LogFile overrides one specified in *.SIM file
+ 6-Rename Error processing routine to Exception processing routine
+ 7-Add Ending Condition for simulation (# of Cycles or Time?) in *.sim file
+ 8-Added check in LoadAll, If different Version then Load Aborts.
+ 9-Fixed problem with Timeout code in all Input Routines; (DeltaTime)
+10-Move much of the 'Beep' code to function WaitaSec();
+11-Moved Protect Garden Boolean Menu item up a few positions in menu
+12-Added menu option for minutes to run simulation 0-65535 (45.5 days)
+13-Had to create new EntNewValW() to handle word size of Min (above)
+14-Allow user to go to menu mode from Graphmode with right arrow key
+15-Removed bacteria count from *.sim,  Now just x/y of pixel is saved
+16-Fixed Error in GetFName, IOMode=7 temporarily (not 6) 
+17-Fixed auto exit trigger to initialize when new sim is loaded 
+18-Extranous test code in SE_IO LoadAll need to be removed
+19-Graph mode will kick in even without a password 
+20-Eliminated Timers[2] and just using "If Readkey" instead 
+21-Removed Double toned beep from Saveall so if Bact is off it wont beep. 
+22-Changed Process_Key in to move yellow highlight without re-writing IOMenu
+N1-Time saved in sim file has no leading zero's (and who cares!)
+
+Ver 0.8c1 (Start: 1-25-96) (Froze: 1-26-96 1:16:00am)
+--------- 
+ 1-Removed debug code that wrote to 'ERROR.LOG';
+ 2-Save system timers to *.SIM file & verify correct restoral
+ 3-System timers changed to be contiguous 1-5
+ 4-Enable loading a *.sim from command line
+ 5-Enable hotkey (Alt-S) save of *.sim
+
+Ver 0.8b2 (Start: 1-21-96) (Froze: 1-24-96 18:30:00pm)                       
+--------- 
+ 1-Fix Screen Saver code to NOT Display Graph when already in IOMode=1
+ 2-Display Simulation Time in upper right hand corner to show 
+ 3-Fixed Max Bugs displays off of top of GRAPH
+ 4-Add code to shorten Keycheck interval if not in Screen Saver mode 33/150
+ 5-Move Place Bacteria Timer back to Bug Moves
+ 6-Moved Update Graph Timer back to Bug Moves
+ 7-Timer Fixed - It periodically returned wrong val because of type err.
+ 8-Timer Fixed again, it when seconds went from 59 to 00, the 00 not displayed.
+ 9-Several more fixed to timer - think I got now.  Had 36,000 constant when
+   I needed a 360000 constant in Func. Now;
+10-This version currently includes test code to write time variable to file
+   'ERROR.LOG' every second for debugging.
+11-Changed Keyboard timer to 20 (200 ms) during Inactive ScreenSaver
+
+Ver 0.8b1 (Start: 1-20-96) (Froze: 1-21-96 00:28:00 )                       
+--------- Seems to work but may loose this version and continue with 0.8a4?
+          Will probably move some events back to bug moves vs. systime?
+          !===============================================================!
+ 1-Added condition to SaveSim,LoadSim & GetLogName for clean exit with <ESC> 
+ 2-Convert all System timers to use system clock, Added Several Functions
+   changed all timer Variable names & structures.
+ 3-Cycle counter uses bug moves, not system timer 
+  -Same needs to happen for Place Bacteria Timer since small pop (3 bugs)
+   eat lots of bact per sec, compared to lots of bugs moving slower & bact count never gets above min. to support larger population.
+N1-Graph Looks different with system timer of course.
+P1-Need to ensure that all desired variable are loaded/retrieved to *.sim
+P1-Warning: Operation off of system clock causes slower systems to have a
+   substantially different feel to the Graph since graph displays less 
+   bug moves per sec resulting in a higher resolution graph, THIS IS BAD!
+                                                       
+Ver 0.8a4 (Start: 1-20-96) (Froze: 1-20-96 18:00:00)
+---------
+ 1-Fixed v0.8a3-P1, in Display_Pause_Option
+ 2-Added code to Save/Load Graph Data, v0.8a3-P3 solved.
+ 3-Changed wGRAPHBuff to constant CGRAPHBuff = 3, Changes value will create load incompatibility across versions. 
+ 4-Removed call to Inti_Graph & code that zero'd wGRAPHCurs1 & 2 in LoadSim
+   All data in a block occupies one line, separated by spaces
+
+Ver 0.8a3 (Start: 1-16-96) (Froze: 1-17-96 22:14:00)                       
+---------
+ 1-Finialize Proc LoadAll()!
+ 2-free all bug memory structures prior to loading new ones from file
+ 3-Converted Functions OnAnyBug() and In_Garden() from internal to external 
+P1-Pause option has top line gray after use
+P2-Loading TEST2.SIM causes beep, meaning bacteria count off?
+P3-Graph initially displays all element as 0 after load.  Should not show any
+   elements after a load, just as if program was started anew.
+P4-Extranous test code in SE_IO LoadAll need to be removed
+
+Ver 0.8a2 (Start 1-16-96) (Froze: 1-16-96 19:53:00)                       
+---------  Good Version! (?)
+ 1-SaveSim to temp file 'TEST.$$$' before load, had to add RTP Field tSave
+ 2-Fixed 0.8a1-P2 by changing conditionals in GetFName(); 
+ 3-Fixed 0.8a1-P3 by adding Writeln;
+ 4-Fixed bug where "Population Graph" not displayed when SSon()
+ 5-Include Menu option for changing state of Garden Protection
+ 6-Use state of tGProtect to enable/disable Garden Protection 
+ 7-Changed SSTimout to 10000, still uses bug moves not sys clock
+P1-SSTimeout doesn’t use system clock?
+
+Ver 0.8a1 (Started 1-15-96) (Froze: 1-15-96 23:47:00)                       
+---------
+ 1-Removed Variable Bact_RateHi as it was not being used
+ 2-Finialized Proc SaveAll().  Vars saved include Globals, Bugs & Bact x/y
+ 3-Program set to beep after save if Bact counted differs from global var.
+ 4-Removed delay in test code in LoadSim so large files handled quickly
+P1-Timeout on Save Simulation menu option sometimes to quick!
+P2-Boundry Alphanumeric characters not accepted by GetFName();
+P3-Missing a <CR> between last bug and start of Bact in saved .SIM file.
+
+Ver 0.7a9 (Started 1-14-96) (Froze: 1-15-96 16:46:00)                       
+---------
+ 1-Used LoadSim as template to finish User Int. on SaveSim & GetLogName
+ 2-Fix menu wipeout during loadsim (0.7a8-P1)
+ 3-SaveSim Proc currently creates file and writes several params
+ 4-LoadSim Proc opens file and reads & displays each line (use small files!)
+P1-User COULD get a runtime error by typing invalid filename character in 
+   command line parameters.  (NOT a big deal?)
+
+Ver 0.7a8 (Started on 1-13-96) (Froze: 1-14-96 20:17:00)                       
+---------   
+ 1-P1 Fixed in SE_IO
+ 2-P2 Fixed in SE_MATH, Procedure InitGraphBuff() & made gardY/XMax constants
+ 3-Took rough edges off of Proc LoadSim
+ 4-Added Code to check if load file exists and confirm file name. 
+ 5-Added password 'darwin' back to code until release 
+ 6-Changed screen timeout to 5000 bug moves (10 cycles ?)
+ 7-Chnged string var in SE_IO, Assign(Simfile) from RTP^.SimFile to FullFName
+N1-Make sure the *.sim file you are trying to load is actually in your 
+   working directory! (../temp)
+P1-Noticed that during confirmation on load sim part of menu was wiped out.
+
+Ver 0.7a7 (Started on 1-13-96) (Froze: 1-13-96 19:02:00)                       
+---------
+ 1-User Interface polishing (Much!)
+ 2-Added Constants & Variables for Sim & Log files
+ 3-Changes procedure name from SimStatGP to SimStatUI (UserInput)
+ 4-Added Procedure GetFname which returns a Filename (snazzy!)
+N1-Much undone work in SE_IO but I believe code to be stable for freeze
+P1-Menu not restored after an Alt-L with no initial password & <CR> entered
+   for password.
+P2-If Garden dimensions maxed out then Garden turned off, bacteria count 
+   on graph exceeds graph boundaries.
+N2-During above testing - Unable to move garden dimensions back down. 
+   Down arrow on menu item just caused a beep(?) (Garden was OFF, Duh!)
+   
+Ver 0.7a6 (Started on 1-13-96) (Froze: 1-13-96 13:17:00)                       
+---------
+ 1-Added IO_B Menu including
+   Save Simulation
+   Load Simulation
+   Logging        T/F
+   Log Period     XX
+   Max File Size  XX   No Time to test so unknown if bugs were introduced
+ 2-Added Right arrow key as option for moving to next menu
+ 3-Changed Initial credit display time to work off of system clock
+ 4-Fixed problem with Process_Key returning to graph mode when key struck
+   While in a menu option that requires text input
+ 5-Changed Message timout to work off of system clock.  Done by adding
+   Procedure WaitaSec() in SE_COM.
+
+Ver 0.7a5 (FROZE 1-7-96 6:28pm) No known problems, Drift Cntr Enabled
+--------
+ 1-Changed Functions CountAll & Count Garden back to return a Word
+ 2-Heavy modification of SE_IO.  Extended char is now stored in ExCh
+   at begining of Proc Process_Key.  Password Functions also cleaned up.
+ 3-Removed Restore Defaults option from Menu options
+ 4-Modified GetNewPass to interpret "<CR>" as a Carriage Return
+
+Ver 0.7a4 (FROZE 12-17-95 7:48pm) PROBLEM?-Test/Debug Code Enabled
+--------
+ 1-Added code to Beep when down arrow key struck when at top of user menu.
+ 2-Added space at end of text constant Desc[12,1] in SE_COM to display "y". 
+ 3-Implemented code to adjust garden & screen count after manual changes
+ 4-Changed Functions CountAll & Count Garden to return Integer vs. Word
+ 5-Added Timer block 7 to calculate Drift (Only works when Garden ON)
+N*-Note: This fixed problem 0.7a3.3 below until this timer removed
+   Must remember to adjust NUMOFTIMER to correct value!
+ 6-Changed Display Drift Function to show Screen & Garden Drift
+ 7-Added Function ReCalc_Garden() in SE_MATH.  Required to recalculate all
+   affected variables once Width or Hight changed.  Drift mostly fixed. 
+ 8-Added Function ModifyTF() in SE_IO to adjust Boolean values in Menu.  
+ 
+N1-Have DRIFT problem even when NOT adjusting garden boundaries.  It MUST be 
+   a round off error in SE_MATH or SE_GRAPH when determining if a bacteria
+   is in or out of garden.  It mostly averages out so garden either has a
+   few bacteria that belong to Screen or visa-versa.  Discrepancy becomes more pronounced when shrinking garden but could still be attributable to round off error. (Turning garden off/on will zero out drift temporarily)
+
+N2-Suspect a problem in the count bacteria procedures because -/+ drift between screen becomes uneven for a while then evens back out?  Another
+possible round off error when counting garden second time? (Pretty sure!)
+
+Ver 0.7a3 FROZE (12-17-95)   Bug Fix (User Interface under construction)
+--------
+ 1-Fixed Bug in SE_IO, Modify function, SetTextJustify to defaults at end.
+ 2-Fixed Bug in SE_IO, Process_Key function, Needed to set IOMode=1 before
+   calling SSOff() procedure so as not to underrun the Desc. Array.
+ 3-Deleted procedure SSOff() as one line was redundant and other line moved
+   to calling function.
+ 4-Fixed Bug in SE, Timers[5], Graph is now updated when screen saver on.  
+N1-NUMOFTIMERS in SE_COM was 7 when only 6 timers were being used. (Problem?)
+
+---------------------------------------------------------------------------
+12-16-95: Version 0.7apt1 & 0.7apt2 obtained from temp (working) directories
+          and froze.  Work began from version 0.7apt2 as tracked above.
+          (It's been over a year since last coding session)
+---------------------------------------------------------------------------
+
+Ver 0.7apt1/2 FROZE (9-25-94)       User Interface/Control
+--------
+ ?-Several Changes, use DIFF.EXE to determine if needed?
+
+Ver 0.6b FROZE (9-18-94)       Screen Saver/Password
+--------
+ 1-Added functions SSActive & SSDeactive
+ 2-Added timer[6]
+ 3-Added function CheckPass in SE_IO Unit
+ 4-Delete residual code for colored dots for wakeup & waiting for user
+ 5-Fixed rectangle coordinates in Display_Screen (?)
+ 6-Deleted code and variables for bSLIML and changed bSLIMH to bSLIM,etc.  
+ 7-Added "Password Locked"
+ 8-Added code to change password-change is currently lost on program exit
+ 9-header for Species Stats
+10-Fixed problem with top of Graph border being erased when disabling garden.
+ 
+ Ver 0.6a SKIPPED! (9-10-94)                      
+--------
+*-On Hold for CRC Algorithim 
+
+Ver 0.5i FROZE (5-31-94)       Species Identification        
+--------
+1-Disble Mutation of MATURE
+2-Corrected internet address during intro
+3-Reduced Mutation Rate from 60 to 42
+4-Removed constants for non-VGA support
+5-Calculate mean and Std Dev for each bug
+6-Modify insert function to sort LL by mean of genes
+7-Added SpeciesID to RTP to hold species data
+8-Constant will specify threshold for Std Dev for identify species
+9-Function to calculate species Ident data every cycle using timer
+10-Function to display species data
+                          123456789012345678
+                          0:  _23/2.30   = 96 pixels
+
+Ver 0.5h FROZE (5-23-94)       Garden Isolation
+--------
+1-Added code in proc that calculates next move and position to turn a bug that
+  is moving vertically (Dir=0 or 3) towards the garden when the garden is on.
+  VERTICALY MOVING BUGS NO LONGER STEAL FROM GARDEN!
+2-changed bMAXBUGS to wMAXBUGS
+3-Mutation Severity and Mutation Rate have a resolution of 255 by shifting
+  the probability left or right on the number line.  This change was made in
+  unit SE_BUG function "mutate".  4 random number are generated from 0 to
+  range and then divided by 4 times range to produce low std-dev.
+4-Tested mutation of MAX_AGE (Ok?)
+5-Changed 'user = test' to 'User=restricted'
+6-Changed code in SE_GRAPH to use same proc (Display_value)
+
+
+!!!!!!!(This Peliminary version distributed to Jim Emery on 4-28-93)!!!!!!!
+Ver 0.5g+ FROZE (4-27-93) Display Objects/Modification Security
+--------
+1  -Add function SimStatSA;  (SPECIES ANALYSIS)
+2  -Add function SimStatPS;  (PAUSED: SCROLLING)
+3  -Add function SimStatUG;  (UPDATING GRAPH)
+4  -Add function SimStatRD;  (READING DISK)
+5  -Add function SimStatWD;  (WRITING DISK)
+6  -Add function Display_Graph, resolution is from Const GRPHRES
+7  -GRPHRES from wTIMER[5] and displayed as moves/grid
+8  -Add function Update_Graph; plots Bugs and  Total Bact and rolls graph
+    by searching for pixel of that color in next left column (inefficent)
+9  -Added Proc Init_Graph_Buff, Update_Graph, Update_Graph_Data,
+    Display_Graph_Data, Clear_Graph.  Graph data is now stored in a form
+    of a matrix data base and displayed from this matrix.  RTP^.GRPHMatrix
+10 -Added internet address to initial display screen and changed size/colors
+11 -Changed Graph_Data Function so that every pixel of every graph object is
+    erased and re-written from right to left (major effort).
+12 -Changed color of names of statistics displayed as graph objects to match
+    the color of the graph object.
+13 -Added delay to WriteError so message will remain on screen for 2.5 sec's
+    in a DOS window before closing.
+14 -Added code in SE.PAS to detect a time/date other than expected and exit
+    with error message if different. Date Expected = 4-27-93 12:01am
+
+Ver 0.5f  FROZE (1-21-93) Enhanced flexibility
+--------
+1  -move ALL variables but Finished, xold, and yold from main into RTP
+2  -pass specific color to statistic/menu display procs in addition to RTP
+3  -Alternate LL traversal so as to be fair to bugs with same X/Y and dir.
+4  -VGAMAXX/Y(640.480) EGAMAXX/Y(640.350) CGAMAXX/Y(320.200) replace MAXX/Y
+5  -REMOVE PIXEL Type record
+6  -verify that all statistics and menus are "attached" to screen borders
+7  -Added lines in Calc_Defaults to set SCREENLIM/GARDENLIM to minimum of 1
+8  -Add two variables controlling mutation  RTP^.wMUTRATNG,wMUTRATMS
+9  -Add following characteristics to mutatable variables in BUG_CELL
+      wMAXAGE     wMAXSTR      Function Mutate() created
+      wREPROSTR   wMATURE
+      Mutation optional for each variable.
+10 -Change BACTLIMPCT from a (%) of MAXBACT to (%) of total screen
+11 -BACT_STAT changed to Bact_RateHi and indicates Hi/Low bact placement
+
+Ver 0.5e FROZE (1-16-92)
+--------
+1  -Display_Menu func. now has three rows on bottom and centers text on right.
+2  -wHILIT_COL added to RTP, Disp_Menu funct. uses colors from RTP
+3  -Display_Bug/Bact/Gen no-longer paints header for every call, and stat
+    display raised to y=50.
+4  -Std. Dev. and Cycles/hr now displayed with stats. (Generation renamed)
+5  -Stat headers justified from Screen border and values from VGA borders.
+6  -Remove check for Bact Drift
+7  -change display menu so that XY Cursor are incremented as text written.
+8  -Add Simulation Status header
+9  -Add Code to update Sim Status
+10 -Add Registration header to screen (Will incorperate encryption later)
+11 -Changed RTP^.wTEXT_COL to wTEXTF_COL and added wTEXTB_COL (Background)
+12 -Moved Color_Rectangle towards top of UNIT SE_GRAPH because of use by
+    SimStat proc's.
+13 -Change display stat proc's to use new wTEXTB_COL (Black)
+14 -Created MAX/MIN/X/Y vars in RTP
+15 -Change two RTP variables for gridres into four gridres for x/y for S/G
+16!-Fixed bug with garden boundries; formula for lTemp, used in formula for
+    x,y coordinates in Populate_Garden(), needed a (+1) on end
+17 -When counting bact, only count along gridres, x16 increase in speed!
+18 -Added proc Display_GardenOption and changed Display_Menu accordingly
+19 -Added proc Display_PauseOption and changed Display_Menu accordingly
+20 -Moved location of drift displayed in Display_Drift proc in test Unit
+
+Ver 0.5d  FROZE (1-8-93)    Slight Problem with garden boundries? (see 0.5e16)
+--------
+1  -All Variables in RTP Record have an added letter proceding the var
+    name indicating type as follows:
+         s : shortint         i : integer         l : longint
+         b : byte             w : word            r : real
+2  -Moved calculation of bGARDENLIM/bSCREENLIM in Calc_Defaults before
+    calculation of GMAXATTEMPTS and SMAXATEMPTS since they use the value
+    of bGARDENLIM/bSCREENLIM in their definition!
+    (Solution of 1 potential run-time error)
+3  -Moved OnAnyBug() function in SE_GRAPH out of Until loop so that the
+    LL is not traversed unless all other conditions are met.
+4  -Used Record Typecasting to insure that only variables of type Real
+    are passed to Func Trunc() and result of func. Trunc() is only
+    assigned to type of LongInt.
+5  -Changed all color variables to type word.  Changed most integer
+    types to type word.
+6  -Used Record Typecasting to insure that all formulas include
+    only variable types that will give desired value.
+7  -Used Record Typecasting to insure that all assignments return same
+    type as L-Value variable.
+8  -!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    FIXED LOCKUP !!!! RTP is NOW assigned a value prior to Set_Defaults()!
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+9  -Fixed problem with formula for RTP^.wGARDNEARX/Y
+10 -Fixed problem with runaway bact count (induced by changing variables
+    Add_to_Screen and Add_to_Garden to type Word in Populate..() functions)
+    by setting values to 0 if Bact.. count > wMAXBACT..
+11 -Changed Bug^.age type to Word and header/trailer node value to ($FFFF)
+
+Ver 0.5c FROZE (1-1-93) HAS RUNTIME ERROR (See Ver 0.5d for fix)
+--------
+1  -Moved function Set_Defaults(RTP) into SE_MATH
+2  -Moved all formulas in Set_Defaults into function Calc_Defaults(RTP)
+3  -Make Garden bacteria line up with screen grid
+4  -Move Timer procedure into SE.PAS
+
+Ver 0.5b FROZE (12-31-92) HAS RUNTIME ERROR (See Ver 0.5d for fix)
+--------
+1  -Added Function Display_Screen; that draws border rectangle and
+    fills area with BACK_COL
+2  -Renamed Procedure Blank_Coord to Color_Rectangle (used above)
+3  -Changed way bacteria deposited to include MAXX/MAXY limits.
+4  -Changed formulas in SE_MATH/SE_GRAPH for bugs to be wrapped to
+    inclued new MAXX/MAXY limits, dimension now MAX?-MAX?+1.
+5  -Note: Calculated Values
+        Bug Record = 63 Bytes
+        Minimum memory in heap for graphics drivers = 9616 Bytes
+        Minimum required memory = 9616 + (63 * MAXBUGS)
+    Compilation with MinHeap set to 32K combined with cap on MAXBUGS
+    should eliminate risk of out of mem Error at runtime.
+6  -Changed SE_Error functions to use RTP fields instead of static vars.
+    Also, Error text is embeded in WriteError function with case statement.
+7  -Logic Errors in function Child_Bug; were corrected.  Possible
+    access of array beyond boundries!
+8  -Used Type casting in SE_COM function Set_Defaults to assign longint to
+    type integer;
+9  -Added two fields to RTP, SCREENLIMPCT, GARDENLIMPCT for to be used for
+    calculating SCREENLIM and GARDENLIM.  ALSO changed SDENSITY and GDENSITY
+    to hold 1.2% as value 1.20 instead of 0.012.
+10 -Using Turbo Pascal 6.0 instead of 5.5!
+11 -typcasting intermediate results in SE_COM. exmpl:
+    RealTemp      := GARDWID * GARDHIG * GDensity * 0.01;
+    LongTemp      := Trunc(RealTemp);
+    Instead of calculating 1st formula inside Trunc function!
+12 -Fixed logic error in SE_GRAPH, Populate_Screen & Populate_Garden
+    Need to check for excessive attempts value in Until statement.
+    Could also be fixed by doing complete Boolean evaluation instead of
+    short circuit? (I hope)
+13 -For successful execution from inside compiler the following options were
+    set  (286,Full Boolean evaluaton,MinHeap=32768,MaxHeap=32768)
+
+Ver 0.5a FROZE (12-26-92) HAS RUNTIME ERROR (See Ver 0.5d for fix)
+--------
+1  -Placed most constants in the record RTP (SE_COM) to which a pointer
+    is passed all over hell as apposed to making them global variables.
+2  -Added function Set_Defaults to SE_COM
+3  -All non-integers are type real because type single requires 80x87.
+4  -Moved Function WaitForAnykey to SE_TEST.
+5  -Note (TURBO.TP file set for MinHeap = 32K/MaxHeap = 64K)
+
+Ver 0.4f FROZE (12-25-92)   No Known Errors
+--------
+1  -Added Function OnAnyBug to determine if chosen coordinates for
+    placement of a bacteria are on the body of any bugs. (DRIFT FIXED!)
+2  -Fixed Creat_Bugs so that MinX/MinY are used
+3  -Added Color constant BC_Vry_O (DarkGray) for very old bugs.
+4  -Fixed Display of Statistics on right so that all is right justified.
+    Procedures Display_Bug, Bact, etc. in SE_GRAPH
+
+Ver 0.4e FROZE (12-23-92)
+--------
+1  -Move all test functions to test unit
+2  -Problem in the way bacteria drift calculated resolved
+3  -Changed graphics formulas for constants to inclued MinX/MinY
+4  -Probelm in the way constant GARDFARY calculated resolved.
+5  -Moved Triggers for Timer block from SE_COM to SE_TIMER
+6  -When < minimum # of bugs occures, new genes are calc'd for bug.
+7  -Code Added to SE_BUG to catch Gene values that would cause floating
+    point overflow.  Still need code to handle recovery or explain error.
+8  -Changed 6 bug genes to reside in an array to reduce code size
+9  -Added unit SE_ERROR to store runtime errors, halt execution
+    and display runtime errors if they occur.
+
+Ver 0.4d FROZE (12-9-92)
+--------
+1  -Added function Display_all_of so that a "portion" of a bug is never
+    displayed on the screen and a bacteria can never be placed in the
+    space that a bug is supposed to exist.  Clears up all Bact Drift?
+
+Ver 0.4c  FROZE (12-7-92)
+--------
+1  -Reworked Main; Procedures CheckforFood and Move combined into
+    Search_For_Food.  Header/Trailer Node in LL now indicated by dir= -1
+2  -Procedure Remove changed to Erase_Previous_Pos and overwrites only
+    over Bug pixels that will not be part of Bugs new position.
+3  -The way MaxX and MaxY borders are handled changed
+4  -When displaying bug in new position only changed pixels are written
+    (see item 2 above)
+6  -Fixed logic in SE_IO.PAS that differentiated between Screen Count and
+    Garden Count when Garden state changed.
+5  -Evidence that "minute" Bacteria Drift still exists.  This seems to
+    occur in function Erase_Previous_Pos?
+
+Ver 0.4b  FROZE (12-3-92)
+--------
+1  -Changed method bacteria is deposited in garden.  It is now similar to
+    rest of screen (Major Graphics revamp!)
+2  -Changed bact deposit code so that bact does not land on bugs.
+3  -Changed bug check for food so as not to search bug pixels for bact.
+
+Ver 0.4a  FROZE (12-2-92)
+--------
+1  -Fixed Problem with major bacteria drift.  Minor drift still exists.
+    Problem was in initial FOR loop index being a 0 instead of 1!
+2  -Fixed pixel overwrite problem (Bacteria)
+3  -Added Function BCount which actually counts Bact_col pixels on screen.
+    Function Places a pixel of Wait_col at bottom right of screen
+    Timer calls Function every 5th generation to account for bact drift.
+    Will be removed once source of problem is found.
+4  -Modified Place_Bact so that the garden is done with a separate func.
+5  -Modified BUG_COM.PAS for running on a monochrome system with small VGA.
+6  -Added function Wait_for_anykey in IO_PAS that does just that.
+7  -Increased range for initial gene variables in Create_But from 3 to 5
+8  -Used Automatic variable in Calc_Prob(New_Bug) to make more efficient
+9  -Changed CONSTANTS to represent those mentioned in initial SE article
+10 -Changed min bact to 2 and max bact to 65
+11 -Made se_com.pas into two files (*.col, *.mon) to compile for color
+    VGA and monochrome (specificaly the DA-30 gas plasma display). Also
+    made bat files to help prep for seperate compilations.
+
+Ver 0.3e
+--------
+1  -Cant remember changes.  Keeping as a refrence prior to other changes.
+
+Ver 0.3d
+--------
+1  -Fixed Problem with Display of # of Gen.
+2  -Added Cnvrt_to_String() to SE_COM.PAS
+3  -Added Display_Bug() to SE_GRAPH.PAS
+4  -Modified Display_Side_Stats() to include Display_Bug();
+
+Ver 0.3c
+--------
+1  -Added Display_Side_Stats() to SE_GRAPH.PAS
+2  -Added Display_Gen() to SE_GRAPH.PAS
+
+Ver 0.3b
+--------
+1  -Changed names of All files to SE_(type).PAS and further structured code.
+2  -Added Timer function to enable interrupt processing
+
+Ver 0.2a
+--------
+1  -Added Color to Bugs
+
+Ver 0.1c
+--------
+1  -Item 2 of 0.1b addressed by not dec Bact_Num if bug in garden
+2  -Garden density lowered to 1/16
+3  -Item 4 of 0.1b addressed by correcting offset formulas
+4  -Dead Bugs now decompose into 9 bact instead of disappearing
+5  -Item 6 of 0.1a caused problem, fixed by allways adding bact if garden on
+6  -CONST in BUG_COM.PAS changed
+7  -Lowest level main loop determined by BactRateDivisor instead of "10"
+
+Ver 0.1b  FROZE
+--------
+1  -Garden of Eden implemented with the DrawPoly() proc at Refresh_Rate
+2  -Bacteria eaten in garden not counted, causing major drift in Bact_Num
+3  -Garden density determined by CONST in GRAPHICS.PAS (50%)
+4  -Garden not centered in screen, offset problem
+5  -Alt-G does not clear garden until next refresh, can be length delay
+
+Ver 0.1a  FROZE
+--------
+1  -Garden of Eden made by higher % bact deposit
+2  -All graphic offsets calculated from MaxX/MaxY CONST's
+3  -Copyright displayed on intro
+4  -User control Keys include Alt-P, Alt-G, and Alt-X
+5  -File EGAVGA.BGI file now required in C:\TP directory
+6  -Bact Replenishment operates as a Schmitt Trigger on two thresholds
+7  -Procedure Calc_Offsets created that will be replaced by CONST dec's
+8  -Spelling errors in source code comments
+9  -Accuracy of Bact_Num can drift quickly because of pixel overwrites
+10 -Screen Refreshed at Refresh_Rate to reset Bact_Num counter
+11 -Initialize of bugs made into a procedure

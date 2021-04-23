@@ -1,0 +1,2176 @@
+UNIT SE_IO;
+
+INTERFACE
+
+USES DOS, CRT, GRAPH, SE_GRAPH, SE_MATH, SE_QUE, SE_COM;
+
+{-----------------------------------------------------------------------------}
+Procedure Process_Key(VAR Finished : Boolean;
+                          RTP      : RTP_PTR);
+
+FUNCTION CheckPass(RTP        : RTP_PTR) : BOOLEAN;
+
+Procedure GetNewPass(RTP      : RTP_PTR);
+
+Procedure SaveSim(RTP         : RTP_PTR);
+Procedure SaveAll(RTP         : RTP_PTR);
+Procedure AutoLoadSim(RTP     : RTP_PTR);
+Procedure LoadSim(RTP         : RTP_PTR);
+Procedure LoadAll(RTP         : RTP_PTR;
+               Var tAbort     : Boolean);
+Procedure GetLogName(RTP      : RTP_PTR);
+Procedure Write_to_Log(RTP    : RTP_PTR);
+
+FUNCTION GetFName(    RTP     : RTP_PTR;
+                      Prompt  : STRING;
+                      Default : STRING;
+                  VAR TOut    : BOOLEAN) : STRING;
+
+Procedure Modify(VAR Val      : Byte;
+                     Min      : Byte;
+                     Max      : Byte;
+                     Y        : Integer;
+                     ExCh     : Char);
+
+Procedure EntNewValW(    RTP  : RTP_PTR;
+                     VAR Valu : Word;
+                         Min  : Word;
+                         Max  : Word;
+                         Y    : Integer);
+Procedure EntNewValB(    RTP  : RTP_PTR;
+                     VAR Valu : Byte;
+                         Min  : Byte;
+                         Max  : Byte;
+                         Y    : Integer);
+
+Procedure ModifyTF(VAR Val    : Boolean;
+                       Y      : Integer;
+                       ExCh   : Char);
+
+IMPLEMENTATION
+{-----------------------------------------------------------------------------}
+Procedure Process_Key;
+
+Var Ch, ExCh     : Char;
+    OldGardPop   : Word;
+    bTimerVal    : Byte;
+    wTimerVal    : Word;
+    LTimerVal    : Word;
+    LF           : Text;      { Text File for Logging - Need to place header }
+    FullFName    : STRING;
+    FileInfo     : SearchRec; { Declared in DOS Unit, used with FindFirst(); }
+    Hour, Min, Sec, Sec100 : Word;
+
+Begin
+  With RTP^ Do Begin
+  ExCh := #3;                 { INITIALIZE ExCh to 'NUL'  }
+  Ch := Readkey;
+  If Ch = #0                      { IF EXTENDED KEY-SCAN CODE }
+  then ExCh := Readkey;	          { THEN GET EXTENDED CHAR    }
+
+  If Ch=#9                        { If TAB }
+    Then Begin
+      If (IOMode>0)
+        Then Begin
+           IOMode := (IOMode mod CIOModes)+1;
+           CASE IOMode of
+              1                 : IOMenu := 1;  { Graph (Normal)      }
+              2                 : IOMenu := 2;  { Password            }
+              3..6,11,12,18     : IOMenu := 3;  { Integer             }
+              7..10,15,16       : IOMenu := 4;  { Boolean             }
+              13,14             : IOMenu := 5;  { File Name           }
+              17,19             : IOMenu := 6;  { Timer Val           }
+              20                : IOMenu := 7;  { Input In Progress   }
+
+           End;
+           CASE IOMode of
+              1     : Begin
+                         Display_Graph(RTP);
+                         Display_Menu(RTP);
+                      End;
+              2     : Display_IO_A(RTP);
+              3..12 : Begin
+                        SetColor(BLACK);
+                        SetLineStyle(Solidln,0,Normwidth);
+                        Rectangle(wGRPHMINX+1, wGRPHMINY+((IOMode-3)*20 +3),
+                                  wGRPHMAXX-1, wGRPHMINY+((IOMode-3)*20)+23);
+                        SetColor(Yellow);
+                        Rectangle(wGRPHMINX+1, wGRPHMINY+((IOMode-2)*20 +3),
+                                  wGRPHMAXX-1, wGRPHMINY+((IOMode-2)*20)+23);
+                        SetLineStyle(Solidln,0,Normwidth);
+                        Display_Menu(RTP);
+                        Display_Desc(RTP);
+                      End;
+             13     : Display_IO_B(RTP);
+             14..19 : Begin
+                        SetColor(BLACK);
+                        SetLineStyle(Solidln,0,Normwidth);
+                        Rectangle(wGRPHMINX+1, wGRPHMINY+((IOMode-14)*20 +3),
+                                  wGRPHMAXX-1, wGRPHMINY+((IOMode-14)*20)+23);
+                        SetColor(Yellow);
+                        Rectangle(wGRPHMINX+1, wGRPHMINY+((IOMode-13)*20 +3),
+                                  wGRPHMAXX-1, wGRPHMINY+((IOMode-13)*20)+23);
+                        SetLineStyle(Solidln,0,Normwidth);
+                        Display_Menu(RTP);
+                        Display_Desc(RTP);
+                      End;
+{            20..25?: Display IO_C(RTP);  etc.
+}
+           End;
+        End;
+    End
+    Else
+    BEGIN
+      If ExCh=#77                        { If Right Arrow }
+      Then Begin
+          If (IOMode>0)
+            Then Begin
+               CASE IOMode of
+                  1          : Begin
+                                 IOMenu := 2;
+                                 IOMode := 2
+                               End;
+                  2..12      : Begin
+                                 IOMenu := 5;
+                                 IOMode := 13;
+                               End;
+                  13..19     : Begin
+                                 IOMenu := 2;
+                                 IOMode := 2
+                               End;
+               End;
+               CASE IOMode of
+                  2 : Display_IO_A(RTP);
+                 13 : Display_IO_B(RTP);
+    {            20 : Display IO_C(RTP);  etc.
+    }
+               End;
+            End;
+      End
+      Else
+      Begin {Process All other keys }
+      If (IOMode > 1) AND (Ch=#27) { ESC KEY }
+        Then Begin
+          IOMode := 1;
+          IOMenu := 1;
+          Display_Graph(RTP);
+          Display_Menu(RTP);
+        End
+        Else
+      CASE IOMode of
+
+        0  :  If CheckPass(RTP)
+                Then Begin
+                   IOMode := 1;
+                   Display_Menu(RTP);
+                   Calc_Species(RTP);
+                   Display_Species(RTP);
+                   Display_Graph(RTP);
+                   Update_Graph(RTP);
+                   Timers[2].Interval := 20; { 0.2 Seconds }
+          End
+                Else Begin
+                   SSOn(RTP);
+                   Display_Graph(RTP);
+                   Update_Graph(RTP);
+                End;
+        1  :  If ExCh <> #3           { IF EXTENDED KEY-SCAN CODE }
+                Then Case ExCh of
+          {Alt-P} #25 : Begin
+                           SimStatP;
+                           Display_PauseOption(True,RTP);
+                           Repeat Begin
+                           { Freeze Elapsed Time since sim Paused}
+                             If Triggered(RTP^.Timers[5])
+                             then Begin
+                                  Inc(RTP^.tStartS);
+                                  If RTP^.tStartS > 86400
+                                  Then RTP^.tStartS := 0;
+                             End;
+                           End;
+                           Until Keypressed;
+                           Ch := Readkey;
+                           Display_PauseOption(False,RTP);
+                           SimStatR;
+                        End;
+          {Alt-L} #38 : Begin
+                           If RTP^.Password = ''
+                           Then GetNewPass(RTP);
+                           If RTP^.Password <> ''
+                           Then Begin
+                             RTP^.Timers[3].LstTriggered :=
+                                  Now - RTP^.Timers[3].Interval;
+                           End;
+                        End;
+          {Alt-S} #31 : Begin                   { Hidden Key !!!!!! }
+                           SaveSim(RTP);
+                           IOMode := 1;        { SIMULATION SAVED SO }
+                           IOMenu := 1;        { BACK TO GRAPH MODE  }
+                           Display_Graph(RTP);
+                           Display_Menu(RTP);
+                        End;
+          {Alt-G} #34 : Begin
+                        If RTP^.GardenOn
+                           Then Begin
+                              RTP^.GardenOn := False;
+                              RTP^.Bact_on_Screen :=
+                                  RTP^.Bact_on_Screen +
+                                  RTP^.Bact_in_Garden;
+                              RTP^.Bact_in_Garden := 0;
+                           End
+                           Else Begin
+                              RTP^.GardenOn := True;
+                              RTP^.Bact_in_Garden := CountGarden(RTP);
+                              RTP^.Bact_on_Screen :=
+                                  RTP^.Bact_on_Screen -
+                                  RTP^.Bact_in_Garden;
+                           End;
+                        Display_Side_Stats(RTP);
+                        Display_Menu(RTP);
+                        End;
+          {Alt-Q,X} #16,#45 :  Finished := True;
+                End;
+
+        2  :  Begin
+              If (Ch=#13)              {ENTER}
+                Then Begin
+                        GetNewPass(RTP);
+                        IOMode := 1;          { PASSWORD CHANGED SO BACK }
+                        IOMenu := 1;          { TO GRAPH MODE            }
+                        Display_Graph(RTP);
+                        Display_Menu(RTP);
+                     End
+                Else Begin
+                        Sound(200);
+                        Delay(200);
+                        NoSound;
+                     End;
+              End;                    
+
+        3  :  If RTP^.GardenOn
+                   Then Begin
+        {ENTER}       If (Ch=#13)
+                      Then EntNewValB(RTP, bGARDWID,CGARDWIDMin,CGARDWIDMax,wGRPHMINY+30)
+    {ANY OTHER KEY}   Else Modify(         bGARDWID,CGARDWIDMin,CGARDWIDMax,wGRPHMINY+30,ExCh);
+
+                      Display_Menu(RTP);
+                      ReCalc_Garden(RTP);
+                      OldGardPop := RTP^.Bact_in_Garden;
+                      RTP^.Bact_in_Garden := CountGarden(RTP);
+                      RTP^.Bact_on_Screen :=
+                          RTP^.Bact_on_Screen +
+                          (OldGardPop - RTP^.Bact_in_Garden);
+                   End
+                   Else Begin
+                     Sound(200);
+                     Delay(200);
+                     NoSound;
+                   End;
+
+        4  :  If RTP^.GardenOn
+                   Then Begin
+        {ENTER}       If (Ch=#13)
+                      Then EntNewValB(RTP, bGARDHIG,CGARDHIGMin,CGARDHIGMax,wGRPHMINY+50)
+    {ANY OTHER KEY}   Else Modify(bGARDHIG,CGARDHIGMin,CGARDHIGMax,wGRPHMINY+50,ExCh);
+
+                      ReCalc_Garden(RTP);
+                      OldGardPop := RTP^.Bact_in_Garden;
+                      RTP^.Bact_in_Garden := CountGarden(RTP);
+                      RTP^.Bact_on_Screen :=
+                          RTP^.Bact_on_Screen +
+                          (OldGardPop - RTP^.Bact_in_Garden);
+                   End
+                   Else Begin
+                     Sound(200);
+                     Delay(200);
+                     NoSound;
+                   End;
+
+        5  :  If (Ch=#13)
+              Then EntNewValB(RTP, bSLIM,1,40,wGRPHMINY+70)
+              Else Modify(         bSLIM,1,40,wGRPHMINY+70,ExCh);
+
+        6  :  If (Ch=#13)
+              Then EntNewValB(RTP, bGLIM,1,20,wGRPHMINY+90)
+              Else Modify(         bGLIM,1,20,wGRPHMINY+90,ExCh);
+
+        7  :  ModifyTF(tMAXAGE,wGRPHMINY+110,ExCh);
+
+        8  :  ModifyTF(tMAXSTR,wGRPHMINY+130,ExCh);
+
+        9  :  ModifyTF(tMATURE,wGRPHMINY+150,ExCh);
+
+        10 :  ModifyTF(tREPROSTR,wGRPHMINY+170,ExCh);
+
+        11 :  If (Ch=#13)
+              Then EntNewValB(RTP, bMUTRATNG,1,254,wGRPHMINY+190)
+              Else Modify(         bMUTRATNG,1,254,wGRPHMINY+190,ExCh);
+
+        12 :  If (Ch=#13)
+              Then EntNewValB(RTP, bMUTRATMS,1,254,wGRPHMINY+210)
+              Else Modify(         bMUTRATMS,1,254,wGRPHMINY+210,ExCh);
+
+        13 :  Begin
+              If (Ch=#13)              {ENTER}
+                Then Begin
+                        SaveSim(RTP);
+                        IOMode := 1;        { SIMULATION SAVED SO }
+                        IOMenu := 1;        { BACK TO GRAPH MODE  }
+                        Display_Graph(RTP);
+                        Display_Menu(RTP);
+                     End
+                Else Begin
+                        Sound(200);
+                        Delay(200);
+                        NoSound;
+                     End;
+              End;
+
+        14 :  Begin
+              If (Ch=#13)              {ENTER}
+                Then Begin
+                        LoadSim(RTP);
+                        IOMode := 1;         { NEW SIMULATION LOADED }
+                        IOMenu := 1;         { SO BACK TO GRAPH MODE }
+                        Display_Graph(RTP);
+                        Display_Menu(RTP);
+                     End
+                Else Begin
+                        Sound(200);
+                        Delay(200);
+                        NoSound;
+                     End;
+              End;                    
+
+        15 :  ModifyTF(tGProtect,wGRPHMINY+50,ExCh);
+
+        16 :  Begin
+                ModifyTF(tLogging,wGRPHMINY+70,ExCh);
+                If (ExCh = #72) AND tLogging
+                Then Begin
+                  GetLogName(RTP);
+                  IOMode := 1;        { LOGGING EITHER ON OR OFF SO }
+                  IOMenu := 1;        { BACK TO GRAPH MODE          }
+                  Display_Graph(RTP);
+                  Display_Menu(RTP);
+                End;
+              End;
+
+        17 :  Begin
+                 If (Ch=#13)
+                 Then Begin
+                       LTimerVal := Timers[4].Interval div Longint(100);
+                       If LTimerVal > 65535
+                       Then wTimerVal := 65535
+                       Else wTimerVal := Word(LTimerVal);
+                       EntNewValW(RTP,wTimerVal,1,3600,wGRPHMINY+90);
+                       Timers[4].Interval := Longint(wTimerVal) * Longint(100);
+                 End
+                 Else Begin
+                        Sound(200);
+                        Delay(200);
+                        NoSound;
+                 End;
+              End;
+
+        18 :  Begin
+                 If (Ch=#13)
+                 Then EntNewValB(RTP,bLogFSize100Kb,1,50,wGRPHMINY+110)
+                 Else Modify(       bLogFSize100Kb,1,50,wGRPHMINY+110,ExCh);
+              End;
+
+        19 :  Begin
+                 LTimerVal := Timers[6].Interval div Longint(6000);
+                 If LTimerVal > 65535
+                 Then wTimerVal := 65535
+                 Else wTimerVal := LTimerVal;
+                 If (Ch=#13)
+                 Then EntNewValW(RTP,wTimerVal,0,65535,wGRPHMINY+130)
+                 Else Begin
+                        Sound(200);
+                        Delay(200);
+                        NoSound;
+                 End;
+                 Timers[6].Interval := Longint(wTimerVal) * Longint(6000);
+              End;
+
+      End; {CASE}
+      End; {Else Begin Process all other Keys}
+    End;
+  End;
+End;
+{-----------------------------------------------------------------------------}
+Procedure Modify;
+
+Var Strng : String;
+
+Begin
+    If (ExCh = #72) AND (Val < Max)                { UP ARROW }
+        Then Inc(Val)
+        Else If (ExCh = #80) AND (Val > Min)      { DOWN ARROW }
+          Then Dec(Val)
+          Else Begin
+            Sound(200);
+            Delay(200);
+            NoSound;
+          End;
+
+  Color_Rectangle(VGAMAXX-40,Y, VGAMAXX-4,Y+10, Black);
+  SetColor(DarkGray);
+  SetTextJustify(RightText, TopText);
+  Str(Val:4,Strng);
+  OutTextXY(VGAMAXX-4, Y, Strng);
+  SetTextJustify(LeftText, TopText);
+
+End; { Modify }
+{-----------------------------------------------------------------------------}
+Procedure ModifyTF;
+
+Begin
+    If ExCh = #72
+        Then Val := Not(Val)
+        Else Begin
+          Sound(200);
+          Delay(200);
+          NoSound;
+        End;
+
+  Color_Rectangle(VGAMAXX-14,Y, VGAMAXX-4,Y+10, Black);
+  SetColor(DarkGray);
+  SetTextJustify(RightText, TopText);
+  If Val
+  Then OutTextXY(VGAMAXX-4, Y, 'T')
+  Else OutTextXY(VGAMAXX-4, Y, 'F');
+  SetTextJustify(LeftText, TopText);
+
+End; { Modify }
+{-----------------------------------------------------------------------------}
+Procedure EntNewValW(    RTP  : RTP_PTR;
+                     VAR Valu : Word;
+                         Min  : Word;
+                         Max  : Word;
+                         Y    : Integer);
+Var
+    sInput,               { User Input                  }
+    sDefault,             { Default Input               }
+    sTemp,                { Temp String for Conversions }
+    sOut       : String;  { Output String for OuttextXY }
+    Ch         : Char;
+    H,M,S,S100 : Word;    { Get all values from Gettime }
+    StartTime,
+    DeltaTime  : Word;    { Timers 1 & 2                }
+    wVal,WCode : Word;    { Stores results of Val()     }
+
+Begin
+
+    SimStatUI;
+    Ch := #0;
+    sInput := '';
+    Str(Valu,sDefault);     { Convert current value to default string }
+    CheckBreak := FALSE;
+    GetTime(H,M,S,S100);   { Get current time (seconds) }
+    StartTime := S;
+    DeltaTime := 0;
+
+    With RTP^ DO
+    Color_Rectangle(0, wSMAXY+3, wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+    RTP^.IOMenu := 7;      { Temporary change while in input mode }
+    Display_Menu(RTP);
+    RTP^.IOMenu := 6;      { There, we changed it back! }
+
+    SetColor(LightGray);
+    OutTextXY(0,(RTP^.wSMAXY+7),'Enter new value: ');
+
+    Str(Min,sTemp);                         { Display's Min & Maximum range }
+    sOut := 'Valid Range is '+ sTemp;       { for user input.               }
+    Str(Max,sTemp);                         {                               }
+    sOut := sOut + ' - ' + sTemp;           {                               }
+    OutTextXY(0,(RTP^.wSMAXY+17),sOut);
+
+    SetFillStyle(SolidFill,LightGray);
+    SetLineStyle(SolidLn, 0, Normwidth);
+    Bar((17*8)+8, RTP^.wSMAXY+6,
+        (17*8)+((Length(sDefault)*8)+8), RTP^.wSMAXY+14);
+    SetLineStyle(SolidLn, 0, Normwidth);
+    SetFillStyle(SolidFill,Black);
+    SetColor(Black);
+    OutTextXY((17*8+9),      { Display default input }
+              (RTP^.wSMAXY+7),sDefault);  { In Inverse video      }
+    SetColor(RTP^.wTEXTF_COL);
+
+    While (DeltaTime < RTP^.InputTimeout) AND (Ch <> #13) AND (Ch <> #27) Do
+    Begin
+
+       { Freeze Elapsed Time since sim Paused}
+       If Triggered(RTP^.Timers[5])
+       then Begin
+            Inc(RTP^.tStartS);
+            If RTP^.tStartS > 86400
+            Then RTP^.tStartS := 0;
+       End;
+
+       If Keypressed
+       then Begin
+          Ch := Readkey;
+          If  (sInput = '') AND (Ch <> #13)
+          Then Begin
+                 Setcolor(Black);
+                 SetLineStyle(SolidLn, 0, Normwidth);       { Erase     }
+                 SetFillStyle(SolidFill,Black);             { Default   }
+                 Bar((17*8), RTP^.wSMAXY+6,
+                     (17*8)+150, RTP^.wSMAXY+14);
+                 SetColor(LightGray);
+          End;
+          Case Ch of
+{BS}       #8  : Begin
+               If Length(sInput) > 0
+               then Begin
+                 sInput := Copy(sInput,0,Length(sInput)-1);
+                 Setcolor(Black);
+                 SetLineStyle(SolidLn, 0, Normwidth);       { Erase     }
+                 SetFillStyle(SolidFill,Black);             { Character }
+                 Bar((17*8)+(Length(sInput)*8)+8, RTP^.wSMAXY+6,
+                     (17*8)+(Length(sInput)*8)+16, RTP^.wSMAXY+14);
+                 SetColor(LightGray);
+               End;
+           End;
+          else
+{DEFAULT} Begin
+             If (Length(sInput) < 5)
+                AND (   ((Ch > #47)       { 0 - 9 }
+                        AND (Ch < #58)))
+             then Begin
+                sInput := sInput + Ch;
+                OutTextXY((17*8)+Length(sInput)*8,
+                          (RTP^.wSMAXY+7), Ch);
+             End;
+          End;
+          End;     { CASE }
+       End;        { IF READKEY }
+       GetTime(H,M,S,S100);   { Get current time (seconds) }
+       If (S < StartTime)
+       THEN DeltaTime := (S+60) - StartTime
+       ELSE DeltaTime := S-StartTime;
+       If DeltaTime < 0
+          Then DeltaTime := DeltaTime + 60;
+    End;        { WHILE}
+
+    If (Ch <> #13) AND (Ch <> #27)
+     Then Begin
+       Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                       RTP^.wSMAXX, VGAMAXY, Black);
+       SetColor(LightRed);
+       OutTextXY(0,(RTP^.wSMAXY+5),'Timeout on user input!');
+       SetColor(LightGray);
+       WaitaSec(RTP, RTP^.MssgTimeout,2);
+     End;
+    If (sInput <> '') AND (Ch = #13)
+       Then Begin
+            Val(sInput, wVal, wCode);
+
+            If ((wVal >= Min) AND (wVal <= Max) AND (wCode = 0))
+            Then Begin
+{Return Val}  Valu := wVal;
+              Color_Rectangle(VGAMAXX-40,Y, VGAMAXX-4,Y+10, Black);
+              SetColor(DarkGray);
+              SetTextJustify(RightText, TopText);
+              Str(Valu:4,sOut);
+              OutTextXY(VGAMAXX-4, Y, sOut);
+              SetTextJustify(LeftText, TopText);
+            End
+            Else Begin
+              Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                              RTP^.wSMAXX, VGAMAXY, Black);
+              SetColor(LightRed);
+              OutTextXY(0,(RTP^.wSMAXY+5),'Input out of range!');
+              SetColor(LightGray);
+              WaitaSec(RTP, RTP^.MssgTimeout,2);
+
+            End;
+       End;
+    Display_Menu(RTP);
+End;
+{-----------------------------------------------------------------------------}
+Procedure EntNewValB(    RTP  : RTP_PTR;
+                     VAR Valu : Byte;
+                         Min  : Byte;
+                         Max  : Byte;
+                         Y    : Integer);
+Var
+    sInput,               { User Input                  }
+    sDefault,             { Default Input               }
+    sTemp,                { Temp String for Conversions }
+    sOut       : String;  { Output String for OuttextXY }
+    Ch         : Char;
+    H,M,S,S100 : Word;    { Get all values from Gettime }
+    StartTime,
+    DeltaTime  : Word;    { Timers 1 & 2                }
+    wVal,WCode : Word;    { Stores results of Val()     }
+
+Begin
+
+    SimStatUI;
+    Ch := #0;
+    sInput := '';
+    Str(Valu,sDefault);     { Convert current value to default string }
+    CheckBreak := FALSE;
+    GetTime(H,M,S,S100);   { Get current time (seconds) }
+    StartTime := S;
+    DeltaTime := 0;
+
+    With RTP^ DO
+    Color_Rectangle(0, wSMAXY+3, wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+    RTP^.IOMenu := 7;      { Temporary change while in input mode }
+    Display_Menu(RTP);
+    RTP^.IOMenu := 3;      { There, we changed it back! }
+
+    SetColor(LightGray);
+    OutTextXY(0,(RTP^.wSMAXY+7),'Enter new value: ');
+
+    Str(Min,sTemp);                         { Display's Min & Maximum range }
+    sOut := 'Valid Range is '+ sTemp;       { for user input.               }
+    Str(Max,sTemp);                         {                               }
+    sOut := sOut + ' - ' + sTemp;           {                               }
+    OutTextXY(0,(RTP^.wSMAXY+17),sOut);
+
+    SetFillStyle(SolidFill,LightGray);
+    SetLineStyle(SolidLn, 0, Normwidth);
+    Bar((17*8)+8, RTP^.wSMAXY+6,
+        (17*8)+((Length(sDefault)*8)+8), RTP^.wSMAXY+14);
+    SetLineStyle(SolidLn, 0, Normwidth);
+    SetFillStyle(SolidFill,Black);
+    SetColor(Black);
+    OutTextXY((17*8+9),      { Display default input }
+              (RTP^.wSMAXY+7),sDefault);  { In Inverse video      }
+    SetColor(RTP^.wTEXTF_COL);
+
+    While (DeltaTime < RTP^.InputTimeout) AND (Ch <> #13) AND (Ch <> #27) Do
+    Begin
+
+       { Freeze Elapsed Time since sim Paused}
+       If Triggered(RTP^.Timers[5])
+       then Begin
+            Inc(RTP^.tStartS);
+            If RTP^.tStartS > 86400
+            Then RTP^.tStartS := 0;
+       End;
+
+       If Keypressed
+       then Begin
+          Ch := Readkey;
+          If  (sInput = '') AND (Ch <> #13)
+          Then Begin
+                 Setcolor(Black);
+                 SetLineStyle(SolidLn, 0, Normwidth);       { Erase     }
+                 SetFillStyle(SolidFill,Black);             { Default   }
+                 Bar((17*8), RTP^.wSMAXY+6,
+                     (17*8)+150, RTP^.wSMAXY+14);
+                 SetColor(LightGray);
+          End;
+          Case Ch of
+{BS}       #8  : Begin
+               If Length(sInput) > 0
+               then Begin
+                 sInput := Copy(sInput,0,Length(sInput)-1);
+                 Setcolor(Black);
+                 SetLineStyle(SolidLn, 0, Normwidth);       { Erase     }
+                 SetFillStyle(SolidFill,Black);             { Character }
+                 Bar((17*8)+(Length(sInput)*8)+8, RTP^.wSMAXY+6,
+                     (17*8)+(Length(sInput)*8)+16, RTP^.wSMAXY+14);
+                 SetColor(LightGray);
+               End;
+           End;
+          else
+{DEFAULT} Begin
+             If (Length(sInput) < 4)
+                AND (   ((Ch > #47)       { 0 - 9 }
+                        AND (Ch < #58)))
+             then Begin
+                sInput := sInput + Ch;
+                OutTextXY((17*8)+Length(sInput)*8,
+                          (RTP^.wSMAXY+7), Ch);
+             End;
+          End;
+          End;     { CASE }
+       End;        { IF READKEY }
+       GetTime(H,M,S,S100);   { Get current time (seconds) }
+       If (S < StartTime)
+       THEN DeltaTime := (S+60) - StartTime
+       ELSE DeltaTime := S-StartTime;
+       If DeltaTime < 0
+          Then DeltaTime := DeltaTime + 60;
+    End;        { WHILE}
+
+    If (Ch <> #13) AND (Ch <> #27)
+     Then Begin
+       Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                       RTP^.wSMAXX, VGAMAXY, Black);
+       SetColor(LightRed);
+       OutTextXY(0,(RTP^.wSMAXY+5),'Timeout on user input!');
+       SetColor(LightGray);
+       WaitaSec(RTP, RTP^.MssgTimeout,2);
+     End;
+    If (sInput <> '') AND (Ch = #13)
+       Then Begin
+            Val(sInput, wVal, wCode);
+
+            If ((wVal >= Min) AND (wVal <= Max) AND (wCode = 0))
+            Then Begin
+{Return Val}  Valu := wVal;
+              Color_Rectangle(VGAMAXX-40,Y, VGAMAXX-4,Y+10, Black);
+              SetColor(DarkGray);
+              SetTextJustify(RightText, TopText);
+              Str(Valu:4,sOut);
+              OutTextXY(VGAMAXX-4, Y, sOut);
+              SetTextJustify(LeftText, TopText);
+            End
+            Else Begin
+              Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                              RTP^.wSMAXX, VGAMAXY, Black);
+              SetColor(LightRed);
+              OutTextXY(0,(RTP^.wSMAXY+5),'Input out of range!');
+              SetColor(LightGray);
+              WaitaSec(RTP, RTP^.MssgTimeout,2);
+
+            End;
+       End;
+    Display_Menu(RTP);
+End;
+{-----------------------------------------------------------------------------}
+Procedure GetLogName(RTP : RTP_PTR);
+
+Var
+    bLF         : file of Byte; { file variable, used to check size Log file  }
+    LF          : text;      { Text file variable, used to access Log file    }
+    Line        : STRING;    { Variable used to access a line of Log file     }
+    TOut        : Boolean;   { Returned as TRUE if timout on user input       }
+    TempFName   : String;    { Used to store string returned from GetFName()  }
+    FullFName   : String;    { Used to store complete file name of SimFile    }
+    FileInfo    : SearchRec; { Declared in DOS Unit, used with FindFirst();   }
+    Hour, Min, Sec, Sec100 : Word;
+    lFileSize   : Longint;
+
+Begin
+  RTP^.tLogging := FALSE; { IT WILL BE TURNED BACK ON IF SUCCESSFULL INPUT }
+  TOut := False;
+  TempFName := GetFName(RTP, 'Log File Name:', RTP^.LogFile, TOut);
+  If NOT(TOut)
+  Then Begin
+    Color_Rectangle(0, RTP^.wSMAXY+3, RTP^.wSMAXX, VGAMAXY, Black);
+    If TempFName <> ''
+    Then Begin
+      RTP^.LogFile := TempFName;
+      FullFName := TempFName + '.LOG';
+      FindFirst(FullFName, AnyFile, FileInfo);
+      Sound(500);
+      Delay(100);
+      NoSound;
+      If DosError = 0
+      Then Begin
+           Sound(500);
+           Delay(100);
+           NoSound;
+           TempFName := GetFName(RTP, 'File Exists, Append to: ',
+                                 RTP^.LogFile, TOut)
+      End
+      Else TempFName := GetFName(RTP, 'Create File? Confirm Name: ',
+                                 RTP^.LogFile, TOut);
+      If NOT(TOut)
+      Then Begin
+        Color_Rectangle(0, RTP^.wSMAXY+3, RTP^.wSMAXX, VGAMAXY, Black);
+        If TempFName = RTP^.LogFile   { If filenames match }
+        Then Begin
+          SetColor(LightGreen);
+          RTP^.tLogging := TRUE;
+          OutTextXY(0,(RTP^.wSMAXY+5),'Logging Active to '+ FullFName);
+          SetColor(LightGray);
+
+          Assign(LF, RTP^.LogFile + '.LOG');
+          FullFName := RTP^.LogFile + '.LOG';
+          FindFirst(FullFName, AnyFile, FileInfo);
+          If DosError = 0
+          Then Begin    { File found so append ! }
+
+            Assign(bLF, RTP^.LogFile + '.LOG');
+            Reset(bLF);
+            lFileSize := FileSize(bLF) div 100000;
+
+            If (RTP^.bLogFSize100Kb > byte(lFileSize))
+
+            Then Begin
+              Close(bLF);
+              Assign(LF, RTP^.LogFile + '.LOG');
+
+              Append(LF);
+              Writeln(LF);
+              Writeln(LF, 'Simulated Evolution Log File ' + VERSION);
+              GetTime(Hour, Min, Sec, Sec100);
+              Writeln(LF,'Logging re-started at ',Hour:2,':',Min:2,':',Sec:2);
+              Writeln(LF);
+              Write(LF,'D Time       C Pop BacS BacG  P0  P1  P2  P3  P4  P5 SD0  SD1  SD2  SD3  SD4  SD5  ');
+              Writeln(LF,'MStr MAge Repr MRSt  MS  MB GH GW SL GL P');
+              Close(LF);
+              WaitaSec(RTP, RTP^.MssgTimeout,1);
+            End
+            Else Begin
+              Close(bLF);
+              Color_Rectangle(0, RTP^.wSMAXY+3,RTP^.wSMAXX, VGAMAXY, Black);
+              SetColor(LightRed);
+              OutTextXY(0,(RTP^.wSMAXY+5),
+                        'File to large, adjust log file size!');
+              SetColor(LightGray);
+              WaitaSec(RTP, RTP^.MssgTimeout,2);
+            End; { If TempFName <> '' }
+          End;          { If DOSError = 0 Otherwise header added elsewhere }
+        End
+        Else If TempFName <> ''
+          Then Begin
+            Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                            RTP^.wSMAXX, VGAMAXY, Black);
+            SetColor(LightRed);
+            OutTextXY(0,(RTP^.wSMAXY+5),
+                      'No Match, Confirmation Failed!');
+            SetColor(LightGray);
+            WaitaSec(RTP, RTP^.MssgTimeout,2);
+          End; { If TempFName <> '' }
+      End;   { If NOT(TOut)  2nd           }
+    End;     { If NOT NULL String Returned }
+  End;       { If NOT (TOut) 1st           }
+  If (TOut)
+  Then Begin
+    Color_Rectangle(0, RTP^.wSMAXY+3, RTP^.wSMAXX, VGAMAXY, Black);
+    SetColor(LightRed);
+    OutTextXY(0,(RTP^.wSMAXY+5),'Timeout on user input!');
+    SetColor(LightGray);
+    WaitaSec(RTP, RTP^.MssgTimeout,2);
+  End;
+End;
+{-----------------------------------------------------------------------------}
+Procedure SaveSim(RTP : RTP_PTR);
+
+Var
+    Line        : STRING;    { Variable used to access a line of save file  }
+    TOut        : Boolean;   { Returned as TRUE if timout on user input     }
+    TempFName   : String;    { Used to store string returned from GetFName()}
+    FullFName   : String;    { Used to store complete file name of SimFile  }
+    FileInfo    : SearchRec; { Declared in DOS Unit, used with FindFirst(); }
+
+Begin
+  TOut := False;
+  TempFName := GetFName(RTP, 'File to Save To:', RTP^.SimFile, TOut);
+  If NOT(TOut)
+  Then Begin
+    Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                    RTP^.wSMAXX, VGAMAXY, Black);
+    If TempFName <> ''
+    Then Begin
+      RTP^.SimFile := TempFName;
+      FullFName := TempFName + '.SIM';
+      FindFirst(FullFName, AnyFile, FileInfo);
+      Sound(500);
+      Delay(100);
+      NoSound;
+      If DosError = 0
+      Then Begin
+         Sound(500);
+         Delay(100);
+         NoSound;
+         TempFName := GetFName(RTP, 'File Exists, Overwrite ',
+                                    RTP^.SimFile, TOut)
+      End
+      Else TempFName := GetFName(RTP, 'Create File? Confirm Name: ',
+                                 RTP^.SimFile, TOut);
+      If NOT(TOut)
+      Then Begin
+        Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                        RTP^.wSMAXX, VGAMAXY, Black);
+        If TempFName = RTP^.SimFile   { If filenames match }
+        Then SaveAll(RTP)
+        Else
+          If TempFName <> ''
+          Then Begin
+            Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                            RTP^.wSMAXX, VGAMAXY, Black);
+            SetColor(LightRed);
+            OutTextXY(0,(RTP^.wSMAXY+5),
+                      'No Match, Confirmation Failed!');
+            SetColor(LightGray);
+            WaitaSec(RTP, RTP^.MssgTimeout,2);
+          End; { If tempFName <> '' }
+      End;   { If NOT(TOut)  2nd           }
+    End;     { If NOT NULL String Returned }
+  End;       { If NOT (TOut) 1st           }
+  If (TOut)
+  Then Begin
+    Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                    RTP^.wSMAXX, VGAMAXY, Black);
+    SetColor(LightRed);
+    OutTextXY(0,(RTP^.wSMAXY+5),'Timeout on user input!');
+    SetColor(LightGray);
+    WaitaSec(RTP, RTP^.MssgTimeout,2);
+  End;
+End;
+{-----------------------------------------------------------------------------}
+Procedure Write_to_Log(RTP : RTP_PTR);
+
+Var
+    bLF       : file of Byte; { file variable, used to check size of Log File }
+    LF        : text;    { Text file variable, used to Write to Log file      }
+    FullFName : STRING;  { Stores full file name of Log File                  }
+    FileInfo  : SearchRec; { Declared in DOS Unit, used with FindFirst();     }
+    Hour, Min, Sec, Sec100 : Word;
+    sVar      : STRING;  { stores variable after string conversion            }
+    Cntr      : integer; { All purpose counter                                }
+    lFileSize : Longint;
+
+Procedure Write_Elapsed(RTP : RTP_PTR; tElapsedS : Longint; wDays : Word);
+
+Var Hr, Min, Sec             : Longint;
+    sDays,sHours,sMins,sSecs : STRING;
+    Cntr                     : Byte;
+
+BEGIN
+With RTP^ Do BEGIN
+
+    Hr := tElapsedS div Longint(3600);
+    tElapsedS := tElapsedS - (Hr * Longint(3600));
+
+    Min:= tElapsedS div Longint(60);
+    tElapsedS := tElapsedS - (Min * Longint(60));
+
+    Str(tElapsedS:2, sSecs);
+    If sSecs[1] = ' '
+    Then sSecs[1] := '0';
+
+    Str(Min:2, sMins);
+    If sMins[1] = ' '
+    Then sMins[1] := '0';
+
+    Str(Hr:2, sHours);
+    If sHours[1] = ' '
+    Then sHours[1] := '0';
+
+    Str(wDays, sDays);
+
+    Write(LF,sDays,' ',sHours,':',sMins,':',sSecs,' ');
+  End;
+End;
+
+Procedure Get_and_Write_Elapsed_time;
+
+Var  tNowS, tElapsedS: Longint;
+
+Begin
+
+With RTP^ Do Begin
+
+    tNowS := Now div Longint(100);
+
+    If (tNowS < tStartS)  { #1 If Currently BEFORE Sim started        }
+    Then Begin               { THEN                                   }
+      If NOT(tBS)            { If it's NOT OK to have condition #1    }
+      Then Begin             {   Must be Just past midnight           }
+
+        tBS := TRUE;         {   It's NOW OK to have condition #1     }
+
+                             {   Calculation will result in a negative}
+                             {   number so add 24 hours worth of sec's}
+        tElapsedS := (tNowS - tStartS) + Longint(86400);
+        Write_Elapsed(RTP, tElapsedS, wDays);
+
+      End
+      Else Begin             {   ELSE it's OK to have condition #1    }
+
+        tElapsedS := (tNowS - tStartS) + Longint(86400);
+        Write_Elapsed(RTP, tElapsedS, wDays);
+
+      End
+    End
+    Else Begin            { #2 Current time is after (or =) sim start }
+      If (tBS)               { If condition #2 is unacceptable        }
+      Then Begin             {   Must be just past sim start time on  }
+                             {   a subsequent day                        }
+        Inc(wDays);          {   Day has passed so Inc Day counter    }
+        tBS := False;        {   It is NOW OK to have Condition #2    }
+        tElapsedS := (tNowS - tStartS);
+        Write_Elapsed(RTP, tElapsedS, wDays);
+
+      End
+      Else Begin             {   ELSE Condition # 2 is ok             }
+
+        {   Normal for sim start day !!!!!!      }
+        tElapsedS := (tNowS - tStartS);
+        Write_Elapsed(RTP, tElapsedS, wDays);
+
+      End;
+    End;
+End;
+End;
+
+Begin
+  SimStatWL;
+
+  With RTP^ Do Begin
+
+    Assign(LF, LogFile + '.LOG');
+    FullFName := LogFile + '.LOG';
+    FindFirst(FullFName, AnyFile, FileInfo);
+
+    If DosError = 0
+    Then Begin    { File found so append ! }
+
+        Assign(bLF, RTP^.LogFile + '.LOG');
+        Reset(bLF);
+        lFileSize := FileSize(bLF) div 100000;
+        Close(bLF);
+        If (RTP^.bLogFSize100Kb > byte(lFileSize))
+
+        Then Begin
+          Assign(LF, LogFile + '.LOG');
+          Append(LF);
+        End
+        Else
+          RTP^.tLogging := FALSE;
+
+    End           { If DOSError = 0    }
+    Else Begin    { File not Found so create }
+        Rewrite(LF);
+        Writeln(LF, 'Simulated Evolution Log File ' + VERSION);
+        GetTime(Hour, Min, Sec, Sec100);
+        Writeln(LF,'Logging started at ',Hour:2,':',Min:2,':',Sec:2);
+        Writeln(LF);
+        Write(LF,'D Time       C Pop BacS BacG  P0  P1  P2  P3  P4  P5 SD0  SD1  SD2  SD3  SD4  SD5  ');
+        Writeln(LF,'MStr MAge Repr MRSt  MS  MB GH GW SL GL P');
+    End;
+
+    If RTP^.tLogging
+    Then Begin
+      Get_and_Write_Elapsed_Time;
+
+      Str(Cycle_Cntr:3,sVar);
+      Write(LF,sVar + ' ');
+
+      Str(NumofBugs:3,sVar);
+      Write(LF,sVar + ' ');
+
+      Str(Bact_on_Screen:4,sVar);
+      Write(LF,sVar + ' ');
+
+      Str(Bact_in_Garden:4,sVar);
+      Write(LF,sVar + ' ');
+
+      FOR Cntr := 0 to NUMOFGENES DO
+          Write(LF, SpeciesID[Cntr].Pop:3,' ');
+
+      FOR Cntr := 0 to NUMOFGENES DO
+          Write(LF, SpeciesID[Cntr].StdDev:4:2,' ');
+
+      Write(LF,Avg.MaxAge:4,' ');
+      Write(LF,Avg.MaxStr:4,' ');
+      Write(LF,Avg.Mature:4,' ');
+      Write(LF,Avg.ReproStr:4,' ');
+
+      Str(bMutratNG:3,sVar);
+      Write(LF,sVar + ' ');
+
+      Str(bMutratMS:3,sVar);
+      Write(LF,sVar + ' ');
+
+      Str(bGARDWID:2,sVar);
+      Write(LF,sVar + ' ');
+
+      Str(bGARDHIG:2,sVar);
+      Write(LF,sVar + ' ');
+
+      Str(bSLIM:2,sVar);
+      Write(LF,sVar + ' ');
+
+      Str(bGLIM:2,sVar);
+      Write(LF,sVar + ' ');
+
+      If (tGProtect)
+      Then Write(LF,'1 ')
+      Else Write(LF,'0 ');
+      Writeln(LF);
+      Close(LF);
+    End;
+  End;
+End;  {Proc Write_to_Log() }
+{-----------------------------------------------------------------------------}
+Procedure SaveAll(RTP : RTP_PTR);
+
+Var OutFile   : text;    { Text file variable, used to access save file     }
+    VarString : string;  { stores variable after string conversion          }
+    VarLen    : integer; { stores length of variable after conversion       }
+    Cnt       : integer; { Counter to count # of Bugs                       }
+    c,x,y : Word;        {    |                                             }
+    lTempx : Longint;    {    |   Used in code to record bact               }
+    lTempy : Longint;    {    |                                             }
+    i,j,k : Word;        { Array Indicies                                   }
+    Temp : GRPH_BLOCK_PTR;{Temp Block Pointer                               }
+    Hour,  Min,  Sec,  Sec100  : Word;
+
+Procedure WriteStr(SimVar : STRING; VarComment : STRING);
+Var Cntr      : integer; { Counter to pad line prior to comments            }
+Begin
+  Write(Outfile, SimVar);
+  VarLen:=Length(SimVar);
+  For Cntr := 1 to (30-VarLen) Do
+     Write(Outfile,' ');
+  Writeln(Outfile,VarComment);
+End;
+
+Procedure WriteVarInt(SimVar : Integer; VarComment : STRING);
+Var Cntr      : integer; { Counter to pad line prior to comments            }
+Begin
+  Write(Outfile, SimVar);
+  Str(SimVar, VarString);
+  VarLen:=Length(VarString);
+  For Cntr := 1 to (30-VarLen) Do
+     Write(Outfile,' ');
+  Writeln(Outfile,VarComment);
+End;
+
+Procedure WriteVarLongInt(SimVar : LongInt; VarComment : STRING);
+
+Type
+WordRec = record
+        Low, High : Word;
+End;
+
+Var Cntr      : integer; { Counter to pad line prior to comments            }
+    sVarL, sVarH : String;
+Begin
+  Write(Outfile, WordRec(SimVar).Low,' ');
+  Write(Outfile, WordRec(SimVar).High);
+  Str(WordRec(SimVar).Low, sVarL);
+  Str(WordRec(SimVar).High, sVarH);
+  VarLen:=Length(sVarL + sVarH);
+  For Cntr := 1 to (29-(VarLen)) Do
+     Write(Outfile,' ');
+  Writeln(Outfile,VarComment);
+End;
+
+Procedure WriteVarReal(SimVar : Real; VarComment : STRING);
+Var Cntr      : integer; { Counter to pad line prior to comments            }
+Begin
+
+  Write(Outfile, SimVar);
+  Str(SimVar, VarString);
+  VarLen:=Length(VarString);
+  For Cntr := 1 to (30-VarLen) Do
+     Write(Outfile,' ');
+  Writeln(Outfile,VarComment);
+End;
+
+Procedure WriteVarWordorByte(SimVar : Word; VarComment : STRING);
+Var Cntr      : integer; { Counter to pad line prior to comments            }
+Begin
+
+  Write(Outfile, SimVar);
+  Str(SimVar, VarString);
+  VarLen:=Length(VarString);
+  For Cntr := 1 to (30-VarLen) Do
+     Write(Outfile,' ');
+  Writeln(Outfile,VarComment);
+End;
+
+Procedure WriteVarBoolean(SimVar : Boolean; VarComment : STRING);
+Var Cntr      : integer; { Counter to pad line prior to comments            }
+Begin
+
+  If SimVar
+  Then Write(Outfile, 1)
+  Else Write(Outfile, 0);
+  For Cntr := 1 to (29) Do
+     Write(Outfile,' ');
+  Writeln(Outfile,VarComment);
+End;
+
+Procedure WriteGrphField(SimVar : Word);
+Var Cntr      : integer; { Counter to pad line prior to comments            }
+Begin
+  Write(Outfile, SimVar);
+  Str(SimVar, VarString);
+  VarLen:=Length(VarString);
+  For Cntr := 1 to (5-VarLen) Do
+     Write(Outfile,' ');
+End;
+
+Procedure Write_Elapsed(RTP : RTP_PTR; tElapsedS : Longint; wDays : Word);
+
+Var Hr, Min, Sec             : Longint;
+    sDays,sHours,sMins,sSecs : STRING;
+    Cntr                     : Byte;
+
+BEGIN
+With RTP^ Do BEGIN
+
+    Hr := tElapsedS div Longint(3600);
+    tElapsedS := tElapsedS - (Hr * Longint(3600));
+
+    Min:= tElapsedS div Longint(60);
+    tElapsedS := tElapsedS - (Min * Longint(60));
+
+    Str(tElapsedS:2, sSecs);
+    If sSecs[1] = ' '
+    Then sSecs[1] := '0';
+
+    Str(Min:2, sMins);
+    If sMins[1] = ' '
+    Then sMins[1] := '0';
+
+    Str(Hr:2, sHours);
+    If sHours[1] = ' '
+    Then sHours[1] := '0';
+
+    Str(wDays:3, sDays);
+
+    Write(OutFile,sDays,' ',sHours,' ',sMins,' ',sSecs);
+    For Cntr := 1 to 18 Do
+       Write(Outfile,' ');
+    Writeln(Outfile,'Days, Hours, Mins & Secs Simulation Elapsed');
+  End;
+End;
+
+Procedure Get_and_Write_Elapsed_time;
+
+Var  tNowS, tElapsedS: Longint;
+
+Begin
+
+With RTP^ Do Begin
+
+    tNowS := Now div Longint(100);
+
+    If (tNowS < tStartS)  { #1 If Currently BEFORE Sim started        }
+    Then Begin               { THEN                                   }
+      If NOT(tBS)            { If it's NOT OK to have condition #1    }
+      Then Begin             {   Must be Just past midnight           }
+
+        tBS := TRUE;         {   It's NOW OK to have condition #1     }
+
+                             {   Calculation will result in a negative}
+                             {   number so add 24 hours worth of sec's}
+        tElapsedS := (tNowS - tStartS) + Longint(86400);
+        Write_Elapsed(RTP, tElapsedS, wDays);
+
+      End
+      Else Begin             {   ELSE it's OK to have condition #1    }
+
+        tElapsedS := (tNowS - tStartS) + Longint(86400);
+        Write_Elapsed(RTP, tElapsedS, wDays);
+
+      End
+    End
+    Else Begin            { #2 Current time is after (or =) sim start }
+      If (tBS)               { If condition #2 is unacceptable        }
+      Then Begin             {   Must be just past sim start time on  }
+                             {   a subsequent day                        }
+        Inc(wDays);          {   Day has passed so Inc Day counter    }
+        tBS := False;        {   It is NOW OK to have Condition #2    }
+        tElapsedS := (tNowS - tStartS);
+        Write_Elapsed(RTP, tElapsedS, wDays);
+
+      End
+      Else Begin             {   ELSE Condition # 2 is ok             }
+
+        {   Normal for sim start day !!!!!!      }
+        tElapsedS := (tNowS - tStartS);
+        Write_Elapsed(RTP, tElapsedS, wDays);
+
+      End;
+    End;
+End;
+End;
+
+
+Begin
+  With RTP^ Do Begin
+
+    SetColor(LightGray);
+    OutTextXY(0,(RTP^.wSMAXY+5),'Saving Simulation...');
+    SimStatWS;
+    If tSave
+      Then Assign(Outfile, SimFile + '.SIM')
+      Else Assign(Outfile, 'TEMP.$$$');
+    Rewrite(Outfile);
+
+
+    Writeln(Outfile, 'Simulated Evolution Simulation Snapshot');
+    Writeln(Outfile, VERSION);
+    Writeln(Outfile);
+
+    GetTime(Hour, Min, Sec, Sec100);
+
+    Writeln(Outfile,'Simulation saved at ',Hour:2,':',Min:2,':',Sec:2);
+    Writeln(Outfile);
+    Writeln(Outfile, 'CAUTION: Incorrect modifications to this file could result in a runtime error!');
+    Writeln(Outfile);
+
+    Writeln(Outfile,'[GLOBAL]');
+    Writeln(Outfile);
+
+    Get_and_Write_Elapsed_Time;
+
+    WriteVarLongInt(    Cycle_Cntr,'Cycle_Cntr, Low Word / High Word');
+
+    WriteVarWordorByte( NumofBugs,'NumofBugs');
+    WriteVarWordorByte( Bact_on_Screen,'Bact_on_Screen');
+    WriteVarWordorByte( Bact_in_Garden,'Bact_in_Garden');
+    WriteVarBoolean(    GardenOn,'GardenOn');
+
+    WriteVarReal(       rSDENSITY,'rSDENSITY');
+    WriteVarReal(       rGDENSITY,'rGDENSITY');
+
+    WriteVarWordorByte( bGARDWID,'bGARDWID');
+    WriteVarWordorByte( bGARDHIG,'bGARDHIG');
+
+    WriteVarReal(       rSLIMPCT,'rSLIMPCT');
+    WriteVarReal(       rGLIMPCT,'rGLIMPCT');
+
+    WriteVarBoolean(    tMAXAGE,'tMAXAGE');
+    WriteVarBoolean(    tMAXSTR,'tMAXSTR');
+    WriteVarBoolean(    tMATURE,'tMATURE');
+    WriteVarBoolean(    tREPROSTR,'tREPROSTR');
+    WriteVarBoolean(    tGProtect,'tGProtect');
+    WriteVarWordorByte( bMUTRATNG,'bMUTRATNG');
+    WriteVarWordorByte( bMUTRATMS,'bMUTRATMS');
+
+    WriteStr(           LogFile,'Log File Name');
+    WriteVarBoolean(    tLogging,'tLogging');
+    WriteVarLongInt(    Timers[4].Interval,'Log Period in 10s of mSec');
+    WriteVarWordorByte( bLogFSize100kb,'Max Size of Log file in 100Kb');
+
+    Writeln(Outfile);
+    WriteVarLongInt(    Timers[6].Interval,'Elapsed time   at which to end program (0=NoEnd)');
+    Writeln(Outfile,'                              Time in 10s of mSec in form of LowWord, HighWord');
+    WriteVarLongInt(    ExpCycles,         'Elapsed Cycles at which to end program (0=NoEnd)');
+    Writeln(Outfile,'                              Cycles in form of LowWord, HighWord');
+
+    Cnt := 0;
+    RTP^.Curr_Bug := RTP^.LL;
+    Point_to_Next(RTP);                           { Point to Next Bug           }
+    While Not PastLast(RTP^.Curr_Bug) Do Begin    { Process LL                  }
+      Inc(Cnt);
+      Str(Cnt, VarString);
+      With RTP^.Curr_Bug^ Do Begin
+        Writeln(Outfile);
+        Writeln(Outfile,'[BUG ' + VarString + ']');
+        Writeln(Outfile);
+        WriteVarWordorByte( age,'age');
+        WriteVarWordorByte( str,'str');
+        WriteVarWordorByte( dir,'dir');
+        WriteVarWordorByte( posx,'posx');
+        WriteVarWordorByte( posy,'posy');
+        WriteVarWordorByte( colr,'colr');
+        WriteVarWordorByte( MAXAGE,'MAXAGE');
+        WriteVarWordorByte( MAXSTR,'MAXSTR');
+        WriteVarWordorByte( MATURE,'MATURE');
+        WriteVarWordorByte( REPROSTR,'REPROSTR');
+        WriteVarInt( gene[0],'gene[0]');
+        WriteVarInt( gene[1],'gene[1]');
+        WriteVarInt( gene[2],'gene[2]');
+        WriteVarInt( gene[3],'gene[3]');
+        WriteVarInt( gene[4],'gene[4]');
+        WriteVarInt( gene[5],'gene[5]');
+      End;
+      Point_to_Next(RTP);                       { Point to Next Bug           }
+    End;
+  End;
+
+{ RECORD ALL GRAPH DATA --------------------------------------------------- }
+  With RTP^ Do
+  Begin
+    c := 0;
+    Writeln(Outfile);
+    Writeln(Outfile,'[GRAPH CTRL]');
+    Writeln(Outfile);
+
+    WriteVarWordorByte( wGRPHDens,'wGRPHDens');
+    WriteVarWordorByte( wGRPHCurs1,'wGRPHCurs1');
+    WriteVarWordorByte( wGRPHCurs2,'wGRPHCurs2');
+
+    WriteVarWordorByte( wGRPHBlok1,'wGRPHBlok1');
+    WriteVarWordorByte( wGRPHBlok2,'wGRPHBlok2');
+
+    WriteVarWordorByte( wGRPHMinX,'wGRPHMinX');
+    WriteVarWordorByte( wGRPHMinY,'wGRPHMinY');
+    WriteVarWordorByte( wGRPHMaxX,'wGRPHMasX');
+    WriteVarWordorByte( wGRPHMaxY,'wGRPHMaxY');
+  End;
+
+  Writeln(Outfile);
+  Writeln(Outfile,'[GRAPH DATA]');
+  Writeln(Outfile);
+
+  With RTP^ Do
+  FOR i := 1 to CGRPHObjs Do
+  Begin
+    Temp := RTP^.GRPHMatrix[i].DataPtr;
+    FOR k := 1 to CGRPHWid Do
+      WriteGrphField(Temp^.Value[k]);
+    Writeln(OutFile);            { Place <CR> between GRPH Blocks         }
+
+    FOR j := 1 to CGRPHBuff Do
+    Begin
+      Temp := Temp^.Next;
+      FOR k := 1 to CGRPHWid Do
+         WriteGrphField(Temp^.Value[k]);
+    Writeln(OutFile);            { Place <CR> between GRPH Blocks         }
+    End; { FOR j }
+    Writeln(OutFile);              { Place Double <CR> between GRPH Objects }
+  End; { FOR i }
+
+{ RECORD ALL BACTERIA ----------------------------------------------------- }
+  With RTP^ Do
+  Begin
+    SimStatCB;
+    c := 0;
+    lTempx := Trunc(1.0*(wSMAXX-wSMINX)/bSGRIDRESx)+1;
+    lTempy := Trunc(1.0*(wSMAXY-wSMINY)/bSGRIDRESy)+1;
+
+    {<CR> Added automaticaly by [GRAPH DATA] Code above }
+
+    Writeln(Outfile,'[BACTERIA] (x,y)');
+    Writeln(Outfile);
+    For x := 0 to lTempx Do
+    Begin
+         For y := 0 to lTempy Do
+         Begin
+              If GetPixel(wSMINX + (x * bSGRIDRESx),
+                          wSMINY + (y * bSGRIDRESy)) = wBACT_COL
+              Then Writeln(OutFile,x,' ',y);
+         End;
+    End;
+    SimStatR;
+  End;
+
+  Writeln(Outfile);
+  Close(OutFile);
+End;  {Proc SaveAll() }
+{-----------------------------------------------------------------------------}
+Procedure AutoLoadSim(RTP : RTP_PTR);
+
+Var
+    SimFile,LF  : text;      { Text file variable, used to access load file }
+    Line        : STRING;    { Variable used to access a line of load file  }
+    FullFName   : String;    { Used to store complete file name of SimFile  }
+    FileInfo    : SearchRec; { Declared in DOS Unit, used with FindFirst(); }
+    tAbort      : Boolean;   { True if load aborted because of version      }
+    Hour, Min, Sec, Sec100 : Word;
+
+Begin
+  FullFName := RTP^.SimFile + '.SIM';
+  FindFirst(FullFName, AnyFile, FileInfo);
+  If DosError = 0
+  Then Begin
+
+{=========================================================================}
+        RTP^.tSave := TRUE;   { Return to default of normal save        }
+        LoadAll(RTP,tAbort);
+        If (tAbort)
+        Then Begin
+            RTP^.tAutoload := False;         { Autoload failed }
+            Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                            RTP^.wSMAXX, VGAMAXY, Black);
+            SetColor(LightRed);
+            OutTextXY(0,(RTP^.wSMAXY+5),
+                      'AutoLoad Failure!');
+            OutTextXY(0,(RTP^.wSMAXY+20),
+                      '*.Sim file is incompatible with this version!');
+            SetColor(LightGray);
+            WaitaSec(RTP, RTP^.MssgTimeout,2);
+            RTP^.SimFile := 'DEFAULT'      { Incompatible SE Versions        }
+        End;
+        Calc_Defaults(RTP);
+{=========================================================================}
+
+  End
+  Else Begin
+    Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                    RTP^.wSMAXX, VGAMAXY, Black);
+    SetColor(LightRed);
+    OutTextXY(0,(RTP^.wSMAXY+5),'File Not Found! '+ FullFName);
+    SetColor(LightGray);
+    WaitaSec(RTP, RTP^.MssgTimeout,2);
+    RTP^.tAutoload := False;           { Autoload failed }
+  End;
+
+  If (RTP^.tLogging) OR (ParamCount > 1) { Meaning LF specified }
+  Then Begin
+    RTP^.tLogging := TRUE;
+    Assign(LF, RTP^.LogFile + '.LOG');
+    FullFName := RTP^.LogFile + '.LOG';
+    FindFirst(FullFName, AnyFile, FileInfo);
+    If DosError = 0
+    Then Begin    { File found so append ! }
+        Append(LF);
+        Writeln(LF);
+        Writeln(LF, 'Simulated Evolution Log File ' + VERSION);
+        GetTime(Hour, Min, Sec, Sec100);
+        Writeln(LF,'Logging Auto-started at ',Hour:2,':',Min:2,':',Sec:2);
+        Writeln(LF);
+        Write(LF,'D Time       C Pop BacS BacG  P0 SD0   P1 SD1   P2 SD2   P3 SD3   P4 SD4   P5 SD5  ');
+        Writeln(LF,'MStr MAge Repr MRSt  MS  MB GH GW SL GL P');
+        Close(LF);
+    End;          { If DOSError = 0    }
+  End;  { If file not found then this will be added when created }
+End;
+{-----------------------------------------------------------------------------}
+Procedure LoadSim(RTP : RTP_PTR);
+
+Var
+    SimFile     : text;      { Text file variable, used to access load file }
+    Line        : STRING;    { Variable used to access a line of load file  }
+    TOut        : Boolean;   { Returned as TRUE if timout on user input     }
+    TempFName   : String;    { Used to store string returned from GetFName()}
+    FullFName   : String;    { Used to store complete file name of SimFile  }
+    FileInfo    : SearchRec; { Declared in DOS Unit, used with FindFirst(); }
+    tAbort      : Boolean;   { True if load aborted because of version      }
+
+Begin
+  TOut := False;
+  TempFName := GetFName(RTP, 'File to Load From:', RTP^.SimFile, TOut);
+  If NOT(TOut)
+  Then Begin
+    Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                    RTP^.wSMAXX, VGAMAXY, Black);
+    If TempFName <> ''
+    Then Begin
+      RTP^.SimFile := TempFName;
+      FullFName := TempFName + '.SIM';
+      FindFirst(FullFName, AnyFile, FileInfo);
+      If DosError = 0
+      Then Begin
+        Sound(500);
+        Delay(100);
+        NoSound;
+        TempFName := GetFName(RTP, 'File Found. Confirm Load:', RTP^.SimFile, TOut);
+        If NOT(TOut)
+        Then Begin
+          Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                          RTP^.wSMAXX, VGAMAXY, Black);
+          If TempFName = RTP^.SimFile   { If filenames match }
+          Then Begin
+            Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                            RTP^.wSMAXX, VGAMAXY, Black);
+            RTP^.tSave := FALSE;  { We are only saving prior to a Load        }
+            SaveAll(RTP);         { Causes simulation to be saved to TEMP.$$$ }
+            RTP^.tSave := TRUE;   { Return to default of normal save          }
+
+{=========================================================================}
+     LoadAll(RTP,tAbort);
+     If (tAbort)
+       Then Begin
+         Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                         RTP^.wSMAXX, VGAMAXY, Black);
+         SetColor(LightRed);
+         OutTextXY(0,(RTP^.wSMAXY+5),
+                   '*.Sim file is incompatible with this version!');
+         OutTextXY(0,(RTP^.wSMAXY+20),
+                   'Restoring original simulation');
+         SetColor(LightGray);
+         WaitaSec(RTP, RTP^.MssgTimeout,2);
+         RTP^.SimFile := 'TEMP.$$$';
+         LoadAll(RTP,tAbort);           { Abort Load because of           }
+         RTP^.SimFile := 'DEFAULT'      { Incompatible SE Versions        }
+       End;
+     Calc_Defaults(RTP);
+{=========================================================================}
+
+            SetColor(LightGray);
+          End
+          Else If TempFName <> ''
+            Then Begin
+              Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                              RTP^.wSMAXX, VGAMAXY, Black);
+              SetColor(LightRed);
+              OutTextXY(0,(RTP^.wSMAXY+5),
+                        'No Match, Confirmation Failed!');
+              SetColor(LightGray);
+              WaitaSec(RTP, RTP^.MssgTimeout,2);
+            End; { If TempFName <> '' }
+        End;     { If NOT(TOut)       }
+      End        { If DOSError = 0    }
+      Else Begin
+        Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                        RTP^.wSMAXX, VGAMAXY, Black);
+        SetColor(LightRed);
+        OutTextXY(0,(RTP^.wSMAXY+5),'File Not Found! '+ FullFName);
+        SetColor(LightGray);
+        WaitaSec(RTP, RTP^.MssgTimeout,2);
+      End;
+    End;   { If NOT NULL String Returned }
+  End;      { If NOT (TOut)               }
+  If (TOut)
+  Then Begin
+    Color_Rectangle(0, RTP^.wSMAXY+3, { Clear Bottom }
+                    RTP^.wSMAXX, VGAMAXY, Black);
+    SetColor(LightRed);
+    OutTextXY(0,(RTP^.wSMAXY+5),'Timeout on user input!');
+    SetColor(LightGray);
+    WaitaSec(RTP, RTP^.MssgTimeout,2);
+  End;
+End;
+{-----------------------------------------------------------------------------}
+Procedure LoadAll(RTP : RTP_PTR; Var tAbort : Boolean);
+
+Var InFile    : text;    { Text file variable, used to access load file     }
+    bIn       : Integer; { stores value of boolean variable read from file  }
+    Cnt       : integer; { Counter to count # of Bugs                       }
+    x,y       : Word;    { Used to read x/y coordinates of bacteria         }
+    lTempx    : Longint; {    |   Used in code to placed bact               }
+    lTempy    : Longint; {    |                                             }
+    New_Bug   : BUG_PTR; { Pointer for loading bugs                         }
+    Dead_Bug  : BUG_PTR; { Pointer for discarding bugs from old simulation  }
+    Pixel     : Byte;    { Used to hold value (color) of pixel on screen    }
+    TempBugs  : Integer; { Var to store # of bugs to load                   }
+    i,j,k     : Word;    { Array Indicies                                   }
+    Temp      : GRPH_BLOCK_PTR;{Temp Block Pointer                          }
+    Days, Hour, Min, Sec : Word;
+    sLogFile  : STRING;  { Holds Log File Name before assigning to LogFile  }
+    sVer      : STRING;  { String var to hold SE version used to save *.sim }
+
+Procedure Calc_new_start_time(Days, Hour, Min, Sec : Word);
+
+Var  tNowS, tElapsedS: Longint;
+
+Begin
+
+With RTP^ Do Begin
+
+    tNowS := Now div Longint(100);
+
+    tElapsedS :=   (Longint(Hour) * Longint(3600)
+                  + Longint(Min)  * Longint(60)
+                  + Longint(Sec));
+
+    wDays := Days;
+    LDays := 500;  {   Hope no-one runs the simulation this long      }
+    LHr   := 100;  {                                                  }
+    LMin  := 100;  {   Guarentees that values will be displayed       }
+    LSec  := 100;  {                                                  }
+
+    If (tNowS > tElapsedS)   { #1 If Currently BEFORE Sim started     }
+    Then Begin               { THEN                                   }
+      tStartS := tNowS - tElapsedS;
+      tBS := FALSE;
+    End
+    Else
+    Begin
+      tStartS := tNowS - tElapsedS + Longint(86400);
+      tBS := TRUE;
+    End;
+    Timers[6].LstTriggered := Now;
+End;
+End;
+
+
+Begin
+  With RTP^ Do Begin
+    Color_Rectangle(0, wSMAXY+3, { Clear Bottom }
+                    wSMAXX, VGAMAXY, Black);
+    SetColor(LightGreen);
+    OutTextXY(0,(RTP^.wSMAXY+5),'Loading Simulation...');
+    SimStatWS;
+  End;
+
+  If RTP^.tSave
+    Then Assign(Infile, RTP^.SimFile + '.SIM')
+    Else Assign(Infile, 'TEMP.$$$');
+  Reset(Infile);
+
+  Readln(InFile);               { Header }
+  Readln(InFile, sVer);         { Version  }
+  Readln(InFile);
+
+  If sVer = VERSION
+  Then BEGIN
+
+    tAbort := FALSE;
+    { Remove all current bugs from memory }
+    Cnt := 0;
+    RTP^.Curr_Bug := RTP^.LL;
+    Point_to_Next(RTP);                         { Point to Next Bug    }
+    While Not PastLast(RTP^.Curr_Bug) Do Begin  { Process LL           }
+        Dead_Bug := RTP^.Curr_Bug;
+        Point_to_Next(RTP);
+        Erase_All_Of(Dead_Bug^.posx, Dead_Bug^.posy, RTP);
+        Del_From_List(Dead_Bug,RTP);
+      Point_to_Next(RTP);                       { Point to Next Bug    }
+    End; { Remove_Dead }
+    RTP^.Curr_Bug := Nil;
+    Init(RTP^.LL);
+
+    Display_Screen(RTP);                { Clear Bug Screen }
+
+    Readln(InFile);              { Time Simulation Saved }
+    Readln(InFile);
+    Readln(InFile);              { CAUTION: }
+    Readln(InFile);
+    Readln(InFile);              { [GLOBAL] }
+    Readln(InFile);
+
+    With RTP^ Do Begin
+
+      Readln(InFile, Days, Hour, Min, Sec);
+      Calc_new_start_time(Days, Hour, Min, Sec);
+      Readln(InFile, WordRec(Cycle_Cntr).Low,WordRec(Cycle_Cntr).High);
+      Readln(InFile, TempBugs);
+      NumofBugs := 0;                     { Number will increment as loaded }
+      Readln(InFile, Bact_on_Screen);
+      Readln(InFile, Bact_in_Garden);
+      Readln(InFile, Bin);
+      GardenOn := Bin = 1;
+      Readln(InFile, rSDENSITY);
+      Readln(InFile, rGDENSITY);
+      Readln(InFile, bGARDWID);
+      Readln(InFile, bGARDHIG);
+      Readln(InFile, rSLIMPCT);
+      Readln(InFile, rGLIMPCT);
+      Readln(InFile, bIn);
+      tMAXAGE := bIn = 1;
+      Readln(InFile, bIn);
+      tMAXSTR := bIn = 1;
+      Readln(InFile, bIn);
+      tMATURE := bIn = 1;
+      Readln(InFile, bIn);
+      tREPROSTR := bIn = 1;
+      Readln(InFile, bIn);
+      tGProtect := bIn = 1;
+      Readln(InFile, bMUTRATNG);
+      Readln(InFile, bMUTRATMS);
+
+      Readln(InFile, sLogFile);       { Log File Name  }
+      If ParamCount < 2
+      Then LogFile := sLogFile;
+      { Else Keep existing LogFile }
+
+      Readln(InFile, bIn);
+      tLogging := bIn = 1;           { Logging on/off }
+      Readln(InFile, Timers[4].Interval);     { Log Period     }
+      Readln(InFile, bLogFSize100kb);
+
+      { !!!!!!!!!!!!!! Maximum Value EntNewValW() can handle is 65535  }
+      { !!!!!!!!!!!!!! So selecting Min. to Run in IOMenu_B() will     }
+      { !!!!!!!!!!!!!! cause a larger value (as can be entered here)   }
+      { !!!!!!!!!!!!!! to revert to the maximum value of 65535 which   }
+      { !!!!!!!!!!!!!! equals 65535 * 6000 = 393216000 (45.5 Days!)    }
+      { Dont select 'Min to Run' and a larger value will be unafected  }
+
+      Readln(InFile);
+      Readln(InFile, WordRec(Timers[6].Interval).Low,WordRec(Timers[6].Interval).High);
+      Readln(InFile);
+      Readln(InFile, WordRec(ExpCycles).Low,WordRec(ExpCycles).High);
+      Readln(InFile);
+    End; { With RTP}
+  End { If Version Match }
+  Else tAbort := TRUE;
+
+
+  If Not(tAbort)
+  Then Begin
+    For Cnt := 1 to TempBugs Do Begin
+      New(New_Bug);
+      With New_Bug^ Do Begin
+        Readln(InFile);
+        Readln(InFile);    { [BUG x] }
+        Readln(InFile);
+        Readln(InFile, age);
+        Readln(InFile, str);
+        Readln(InFile, dir);
+        Readln(InFile, posx);
+        Readln(InFile, posy);
+        Readln(InFile, colr);
+        Readln(InFile, MAXAGE);
+        Readln(InFile, MAXSTR);
+        Readln(InFile, MATURE);
+        Readln(InFile, REPROSTR);
+        Readln(InFile, gene[0]);
+        Readln(InFile, gene[1]);
+        Readln(InFile, gene[2]);
+        Readln(InFile, gene[3]);
+        Readln(InFile, gene[4]);
+        Readln(InFile, gene[5]);
+      End;
+    Calc_Prob(New_Bug);
+    Ins(New_Bug,RTP);
+    Display_All_Of(New_Bug);
+    End;
+
+
+  { LOAD ALL GRAPH OBJECT INFORMATION ------------------------------------- }
+    With RTP^ Do
+    Begin
+      Readln(InFile);
+      Readln(InFile);    { [GRAPH CTRL] }
+      Readln(InFile);
+
+      Readln(InFile,wGRPHDens);
+      Readln(InFile,wGRPHCurs1);
+      Readln(InFile,wGRPHCurs2);
+
+      Readln(InFile,wGRPHBlok1);
+      Readln(InFile,wGRPHBlok2);
+
+      Readln(InFile,wGRPHMinX);
+      Readln(InFile,wGRPHMinY);
+      Readln(InFile,wGRPHMaxX);
+      Readln(InFile,wGRPHMaxY);
+    End;
+
+    Readln(InFile);
+    Readln(InFile);    { [GRAPH DATA] }
+    Readln(InFile);
+
+    With RTP^ Do
+    FOR i := 1 to CGRPHObjs Do
+    Begin
+      Temp := RTP^.GRPHMatrix[i].DataPtr;
+      FOR k := 1 to CGRPHWid Do
+        Read(InFile, Temp^.Value[k]);
+      Readln(InFile);                { Skip over <CR> between Blocks        }
+
+      FOR j := 1 to CGRPHBuff Do
+      Begin
+        Temp := Temp^.Next;
+        FOR k := 1 to CGRPHWid Do
+          Read(InFile, Temp^.Value[k]);
+      Readln(InFile);                     { Skip over <CR> between Blocks   }
+      End; { FOR j }
+      Readln(InFile);          { Skip over Double <CR> between GRPH Objects }
+    End; { FOR i }
+
+  { PLACE ALL BACTERIA ON SCREEN ------------------------------------------ }
+    With RTP^ Do Begin
+
+      SimStatPB;
+
+      lTempx := Trunc(1.0*(wSMAXX-wSMINX)/bSGRIDRESx)+1;
+      lTempy := Trunc(1.0*(wSMAXY-wSMINY)/bSGRIDRESy)+1;
+
+      {<CR> Read automaticaly by [GRAPH DATA] Code above }
+
+      Readln(InFile);    { [BACTERIA] }
+      Readln(InFile);
+      For Cnt := 0 to Bact_on_Screen + Bact_in_Garden Do Begin
+        Readln(InFile,x,y);
+        Pixel := GetPixel(x,y);
+        If (Pixel = wSBK_COL) AND (Not (OnAnyBug(x,y,LL)))
+        Then PutPixel(wSMINX + (x * bSGRIDRESx),
+                      wSMINY + (y * bSGRIDRESy),wBACT_COL)
+        Else If In_Garden(x,y,RTP)
+             Then Dec(Bact_in_Garden)
+             Else Dec(Bact_on_Screen);
+
+      End;
+    End;
+  End;          { If Not(tAbort) }
+  SimStatR;
+  Close(InFile);
+End;  {Proc SaveAll() }
+{-----------------------------------------------------------------------------}
+FUNCTION GetFName(    RTP    : RTP_PTR;
+                      Prompt : STRING;
+                      Default: STRING;
+                  VAR TOut   : BOOLEAN) : STRING;
+
+Var
+    FName      : String;  { File Name                   }
+    Ch         : Char;
+    H,M,S,S100 : Word;    { Get all values from Gettime }
+    StartTime,
+    DeltaTime  : Word;    { Timers 1 & 2                }
+
+Begin
+
+    SimStatUI;
+    Ch := #0;
+    Fname := '';
+    CheckBreak := FALSE;
+    GetTime(H,M,S,S100);   { Get current time (seconds) }
+    StartTime := S;
+    DeltaTime := 0;
+
+    With RTP^ DO
+    Color_Rectangle(0, wSMAXY+3, wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+    RTP^.IOMenu := 7;      { Temporary change while in input mode }
+    Display_Menu(RTP);
+    RTP^.IOMenu := 5;      { There, we changed it back! }
+
+    SetColor(LightGray);
+    OutTextXY(0,(RTP^.wSMAXY+7),Prompt);
+    If Default <> ''  { If default Fname not empty then display it }
+    Then Begin
+        SetFillStyle(SolidFill,LightGray);
+        SetLineStyle(SolidLn, 0, Normwidth);
+        Bar((Length(Prompt)*8)+8, RTP^.wSMAXY+6,
+            (Length(Prompt)*8)+((Length(Default)*8)+8), RTP^.wSMAXY+14);
+        SetLineStyle(SolidLn, 0, Normwidth);
+        SetFillStyle(SolidFill,Black);
+        SetColor(Black);
+        OutTextXY((Length(Prompt)*8+9),      { Display default file name }
+                  (RTP^.wSMAXY+7),Default);  { In Inverse video          }
+        SetColor(RTP^.wTEXTF_COL);
+    End;
+
+    While (DeltaTime < RTP^.InputTimeout) AND (Ch <> #13) AND (Ch <> #27) Do
+    Begin
+
+       { Freeze Elapsed Time since sim Paused}
+       If Triggered(RTP^.Timers[5])
+       then Begin
+            Inc(RTP^.tStartS);
+            If RTP^.tStartS > 86400
+            Then RTP^.tStartS := 0;
+       End;
+
+       If Keypressed
+       then Begin
+          Ch := Readkey;
+          If  (FName = '') AND (Ch <> #13)
+          Then Begin
+                 Setcolor(Black);
+                 SetLineStyle(SolidLn, 0, Normwidth);       { Erase     }
+                 SetFillStyle(SolidFill,Black);             { Default   }
+                 Bar((Length(Prompt)*8), RTP^.wSMAXY+6,
+                     (Length(Prompt)*8)+150, RTP^.wSMAXY+14);
+                 SetColor(LightGray);
+          End;
+          Case Ch of
+{BS}       #8  : Begin
+               If Length(FName) > 0
+               then Begin
+                 FName := Copy(FName,0,Length(FName)-1);
+                 Setcolor(Black);
+                 SetLineStyle(SolidLn, 0, Normwidth);       { Erase     }
+                 SetFillStyle(SolidFill,Black);             { Character }
+                 Bar((Length(Prompt)*8)+(Length(FName)*8)+8, RTP^.wSMAXY+6,
+                     (Length(Prompt)*8)+(Length(FName)*8)+16, RTP^.wSMAXY+14);
+                 SetColor(LightGray);
+               End;
+           End;
+{ESC}      #27 : Begin        { This will cause loop to end }
+                 FName := ''; { This will cause calling code to abort load }
+           End
+          else
+{DEFAULT} Begin
+             If (Length(FName) < 8)
+                AND (   ((Ch > #47)       { 0 - 9 }
+                        AND (Ch < #58))
+                     OR ((Ch > #64)       { A - Z }
+                        AND (Ch < #91))
+                     OR ((Ch > #96)       { a - z }
+                        AND (Ch < #123))
+                     OR (Ch = #95))       { = '_' }
+             then Begin
+                FName := FName + UpCase(Ch);
+                OutTextXY((Length(Prompt)*8)+Length(FName)*8,
+                          (RTP^.wSMAXY+7), UpCase(Ch));
+             End;
+          End;
+          End;     { CASE }
+       End;        { IF READKEY }
+       GetTime(H,M,S,S100);   { Get current time (seconds) }
+       If (S < StartTime)
+       THEN DeltaTime := (S+60) - StartTime
+       ELSE DeltaTime := S-StartTime;
+       If DeltaTime < 0
+          Then DeltaTime := DeltaTime + 60;
+    End;        { WHILE}
+
+    If (Ch <> #13) AND (Ch <> #27)
+       Then  TOut := TRUE
+       Else  TOut := FALSE;
+    If (FName <> '') AND (Ch = #13)
+       Then GetFName    := FName;
+    If (FName = '') AND (Ch = #13)
+       Then GetFName    := Default;
+    If (Ch = #27)
+       Then GetFName    := '';
+    CheckBreak := FALSE;
+End;
+{-----------------------------------------------------------------------------}
+FUNCTION GetPass(    RTP    : RTP_PTR;
+                     Prompt : STRING;
+                 VAR TOut   : BOOLEAN) : STRING;
+
+Var
+    Pass       : String;
+    Ch         : Char;
+    H,M,S,S100 : Word; { Get all values from Gettime }
+    StartTime,DeltaTime      : Word; { Timers 1 & 2                }
+
+Begin
+
+    SimStatUI;
+    Ch := #0;
+    Pass := '';
+    CheckBreak := FALSE;
+    GetTime(H,M,S,S100);   { Get current time (seconds) }
+    StartTime := S;
+    DeltaTime := 0;
+
+    With RTP^ DO
+    Color_Rectangle(0, wSMAXY+3, wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+
+    SetColor(LightGray);
+    OutTextXY(0,(RTP^.wSMAXY+5),Prompt);
+    While (DeltaTime < RTP^.InputTimeout) AND (Ch <> #13) Do
+    Begin
+
+       { Freeze Elapsed Time since sim Paused}
+       If Triggered(RTP^.Timers[5])
+       then Begin
+            Inc(RTP^.tStartS);
+            If RTP^.tStartS > 86400
+            Then RTP^.tStartS := 0;
+       End;
+
+       If Keypressed
+       then Begin
+          Ch := Readkey;
+          Case Ch of
+{BS}       #8  : Begin
+               If Length(Pass) > 0
+               then Begin
+                 Pass := Copy(Pass,0,Length(Pass)-1);
+
+                 Setcolor(Black);
+                 SetLineStyle(SolidLn, 0, Normwidth);
+                 SetFillStyle(SolidFill,Black);
+                 Bar(160 +Length(Pass)*10, RTP^.wSMAXY+5,
+                     170+Length(Pass)*10, RTP^.wSMAXY+13);  { Erase Astrix }
+                 SetColor(LightGray);
+               End;
+          End
+          else
+{DEFAULT} Begin
+             If Length(Pass) < 8
+             then Begin
+                Pass := Pass + Ch;
+                OutTextXY(150+(Length(Pass)*10),
+                          (RTP^.wSMAXY+5),'*');
+             End;
+          End;
+          End;     { CASE }
+       End;        { IF READKEY }
+       GetTime(H,M,S,S100);   { Get current time (seconds) }
+       If (S < StartTime)
+       THEN DeltaTime := (S+60) - StartTime
+       ELSE DeltaTime := S-StartTime;
+       If DeltaTime < 0
+          Then DeltaTime := DeltaTime + 60;
+    End;        { WHILE}
+    If (Ch <> #13)
+       Then TOut := TRUE
+       Else TOut := FALSE;
+
+    GetPass    := Copy(Pass,0,Length(Pass)-1);
+    CheckBreak := FALSE;
+End;
+{-----------------------------------------------------------------------------}
+FUNCTION CheckPass(RTP : RTP_PTR) : BOOLEAN;
+
+Var Ch   : Char;
+    TOut : Boolean;
+
+Begin
+
+   If RTP^.Password <> ''
+   Then Begin
+        If RTP^.Password = GetPass(RTP,'Password:',TOut)
+        Then CheckPass := True
+        Else CheckPass := False;
+   End             { IF PASSWORD <> '' }
+   Else CheckPass := True;
+
+   SSOn(RTP);
+End;
+{-----------------------------------------------------------------------------}
+Procedure GetNewPass(RTP : RTP_PTR);
+
+Var
+    Pass       : String;
+    Valid      : Boolean;
+    TOut       : Boolean;
+
+Begin
+   If RTP^.Password <> ''
+   Then Begin
+   If RTP^.Password = GetPass(RTP,'Old Password:',TOut)
+     Then Valid := TRUE
+     Else Begin
+       Color_Rectangle(0, RTP^.wSMAXY+3, RTP^.wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+       SetColor(LightRed);
+       OutTextXY(0,(RTP^.wSMAXY+5),'Password Incorrect!');
+       SetColor(LightGray);
+       WaitaSec(RTP, RTP^.MssgTimeout,2);
+       Valid := FALSE
+     End
+   End
+   ELSE Begin
+   If Not(RTP^.tHaveKey) Then Begin
+   If RTP^.Key = GetPass(RTP,'Bypass Key:  ',TOut)
+     Then Begin
+          Valid := TRUE;
+          RTP^.tHaveKey := TRUE;
+     End
+     Else Begin
+       Color_Rectangle(0, RTP^.wSMAXY+3, RTP^.wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+       SetColor(LightRed);
+       OutTextXY(0,(RTP^.wSMAXY+5),'Sorry, invalid key');
+       OutTextXY(0,(RTP^.wSMAXY+20),'(Contact author to enable this function)');
+       SetColor(LightGray);
+       WaitaSec(RTP, RTP^.MssgTimeout,2);
+       Valid := FALSE
+     End
+   End;
+   End;
+
+   If Valid
+   Then Begin
+
+    Pass := GetPass(RTP,'New Password:',TOut);
+    If NOT(TOut)
+    Then Begin
+
+     If Pass = GetPass(RTP,'Verify Password:',TOut)
+     Then Begin
+
+     If Pass = '<CR>'                { THESE THREE LINES ARE FOR COMPTLETE }
+       THEN RTP^.Password := ''      { DOS ILLITERATES THAT MIGHT TRY AND  }
+       ELSE RTP^.Password := Pass;   { MISSINTERPERT <CR> AS SOMETHING     }
+                                     { OTHER THAN A SIMPLE CARRIGE RETURN! }
+
+     Color_Rectangle(0, RTP^.wSMAXY+3, RTP^.wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+     SetColor(LightGreen);
+     If Pass = ''
+        THEN OutTextXY(0,(RTP^.wSMAXY+5),'Password Removed!')
+        ELSE OutTextXY(0,(RTP^.wSMAXY+5),'Password Changed!');
+     SetColor(LightGray);
+     WaitaSec(RTP, RTP^.MssgTimeout,1);
+
+     End
+     Else Begin
+
+     Color_Rectangle(0, RTP^.wSMAXY+3, RTP^.wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+     SetColor(LightRed);
+     OutTextXY(0,(RTP^.wSMAXY+5),'Passwords Do Not Match!');
+     SetColor(LightGray);
+     WaitaSec(RTP, RTP^.MssgTimeout,2);
+
+     End;
+    End
+    Else Begin
+     Color_Rectangle(0, RTP^.wSMAXY+3, RTP^.wSMAXX, VGAMAXY, Black);{ Clear Bottom }
+     SetColor(LightRed);
+     OutTextXY(0,(RTP^.wSMAXY+5),'Password Timeout!');
+     SetColor(LightGray);
+     WaitaSec(RTP, RTP^.MssgTimeout,2);
+    End;
+   End;
+   Display_Menu(RTP);
+End;
+end. { SE_IO }
