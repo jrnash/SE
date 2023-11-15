@@ -12,7 +12,7 @@ successive generation of bugs inherits slightly mutated genes from their parents
 and are in constant competition to stumble across the most efficient movement
 pattern for the given environment.
 
-    Copyright (C) 1990-2007  John R. Nash [jrnash@gmail.com]
+    Copyright (C) 1990-2023  John R. Nash [jrnash@gmail.com]
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
